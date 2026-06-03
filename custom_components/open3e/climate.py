@@ -11,6 +11,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.json import json_loads
 
 from custom_components.open3e.definitions.subfeatures.program import Program
+from custom_components.open3e.definitions.subfeatures.domestic_hot_water_status import (
+    DomesticHotWaterStatus,
+    get_domestic_hot_water_status,
+)
 from .const import VIESSMANN_TEMP_HEATING_MIN, VIESSMANN_TEMP_HEATING_MAX, VIESSMANN_UNAVAILABLE_VALUE
 from .coordinator import Open3eDataUpdateCoordinator
 from .definitions.climate import Open3eClimateEntityDescription, CLIMATE
@@ -49,6 +53,8 @@ class Open3eClimate(Open3eEntity, ClimateEntity):
     __current_program: Program | None
     __programs: Any | None
     __compressor_power_state: int | None
+    __circuit_pump_active: bool | None
+    __domestic_hot_water_status: DomesticHotWaterStatus | None
 
     entity_description: Open3eClimateEntityDescription
 
@@ -84,6 +90,8 @@ class Open3eClimate(Open3eEntity, ClimateEntity):
         self.__current_program = None
         self.__programs = None
         self.__compressor_power_state = None
+        self.__circuit_pump_active = None
+        self.__domestic_hot_water_status = None
 
     def __refresh_hvac_action(self) -> None:
         if self._attr_hvac_mode == HVACMode.OFF:
@@ -92,12 +100,29 @@ class Open3eClimate(Open3eEntity, ClimateEntity):
             self._attr_hvac_action = HVACAction.IDLE
         elif self.__compressor_power_state is None:
             self._attr_hvac_action = HVACAction.IDLE
+        elif self.__domestic_hot_water_status in (
+                DomesticHotWaterStatus.ACTIVE,
+                DomesticHotWaterStatus.POSTRUN,
+        ):
+            self._attr_hvac_action = HVACAction.IDLE
+        elif self.__circuit_pump_active is False:
+            self._attr_hvac_action = HVACAction.IDLE
         elif self._attr_hvac_mode == HVACMode.HEAT:
             self._attr_hvac_action = HVACAction.HEATING
         elif self._attr_hvac_mode == HVACMode.COOL:
             self._attr_hvac_action = HVACAction.COOLING
         else:
             self._attr_hvac_action = HVACAction.IDLE
+
+    @staticmethod
+    def __power_state_active(data: str) -> bool | None:
+        try:
+            power_state = json_loads(data)["PowerState"]
+            if isinstance(power_state, dict):
+                power_state = power_state["ID"]
+            return int(power_state) > 0
+        except (TypeError, ValueError, KeyError):
+            return None
 
     @property
     def available(self):
@@ -169,11 +194,16 @@ class Open3eClimate(Open3eEntity, ClimateEntity):
                 self.__refresh_hvac_action()
 
             case self.entity_description.compressor_state_feature.id:
-                power_state = json_loads(self.data[feature_id])["PowerState"]
-                try:
-                    self.__compressor_power_state = int(power_state)
-                except (TypeError, ValueError):
-                    self.__compressor_power_state = None
+                active = self.__power_state_active(self.data[feature_id])
+                self.__compressor_power_state = int(active) if active is not None else None
+                self.__refresh_hvac_action()
+
+            case self.entity_description.circuit_pump_feature.id:
+                self.__circuit_pump_active = self.__power_state_active(self.data[feature_id])
+                self.__refresh_hvac_action()
+
+            case self.entity_description.domestic_hot_water_status_feature.id:
+                self.__domestic_hot_water_status = get_domestic_hot_water_status(self.data[feature_id])
                 self.__refresh_hvac_action()
 
             case self.entity_description.flow_temperature_feature.id:
