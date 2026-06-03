@@ -48,6 +48,7 @@ class Open3eClimate(Open3eEntity, ClimateEntity):
 
     __current_program: Program | None
     __programs: Any | None
+    __compressor_power_state: int | None
 
     entity_description: Open3eClimateEntityDescription
 
@@ -82,6 +83,21 @@ class Open3eClimate(Open3eEntity, ClimateEntity):
 
         self.__current_program = None
         self.__programs = None
+        self.__compressor_power_state = None
+
+    def __refresh_hvac_action(self) -> None:
+        if self._attr_hvac_mode == HVACMode.OFF:
+            self._attr_hvac_action = HVACAction.OFF
+        elif self.__compressor_power_state == 0:
+            self._attr_hvac_action = HVACAction.IDLE
+        elif self.__compressor_power_state is None:
+            self._attr_hvac_action = HVACAction.IDLE
+        elif self._attr_hvac_mode == HVACMode.HEAT:
+            self._attr_hvac_action = HVACAction.HEATING
+        elif self._attr_hvac_mode == HVACMode.COOL:
+            self._attr_hvac_action = HVACAction.COOLING
+        else:
+            self._attr_hvac_action = HVACAction.IDLE
 
     @property
     def available(self):
@@ -150,26 +166,15 @@ class Open3eClimate(Open3eEntity, ClimateEntity):
 
                 self.__current_program = hvac_state
                 self._attr_hvac_mode = HvacMode.to_ha_hvac_mode(hvac_mode)
-
-                if hvac_mode == HvacMode.Off:
-                    self._attr_hvac_action = HVACAction.OFF
-                elif hvac_mode == HvacMode.Heating:
-                    self._attr_hvac_action = HVACAction.HEATING
-                elif hvac_mode == HvacMode.Cooling:
-                    self._attr_hvac_action = HVACAction.COOLING
+                self.__refresh_hvac_action()
 
             case self.entity_description.compressor_state_feature.id:
                 power_state = json_loads(self.data[feature_id])["PowerState"]
-
-                if self._attr_hvac_mode == HvacMode.Off:
-                    self._attr_hvac_action = HVACAction.OFF
-                else:
-                    if power_state == 0:
-                        self._attr_hvac_action = HVACAction.IDLE
-                    elif self._attr_hvac_mode == HvacMode.Heating:
-                        self._attr_hvac_action = HVACAction.HEATING
-                    elif self._attr_hvac_action == HvacMode.Cooling:
-                        self._attr_hvac_action = HVACAction.COOLING
+                try:
+                    self.__compressor_power_state = int(power_state)
+                except (TypeError, ValueError):
+                    self.__compressor_power_state = None
+                self.__refresh_hvac_action()
 
             case self.entity_description.flow_temperature_feature.id:
                 self.__current_flow_temperature = json_loads(self.data[feature_id])["Actual"]
