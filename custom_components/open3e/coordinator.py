@@ -33,6 +33,12 @@ _LOGGER = logging.getLogger(__name__)
 from homeassistant.helpers import device_registry
 from .definitions.features import Feature
 
+ROOM_DEVICE_DIDS = {
+    *range(1886, 1944, 3),
+    *range(2086, 2144, 3),
+    *range(2262, 2320, 3),
+}
+
 
 @dataclass
 class CoordinatorEndpoint:
@@ -106,6 +112,21 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
 
         self.system_information = await self.__client.async_get_system_information(self.hass)
         for device in self.system_information.devices:
+            advertised_room_dids = sorted(
+                feature.id for feature in device.features
+                if feature.id in ROOM_DEVICE_DIDS
+            )
+            if advertised_room_dids:
+                _LOGGER.info(
+                    "Open3e advertised room device datapoints for %s: %s",
+                    device.name,
+                    advertised_room_dids,
+                )
+            else:
+                _LOGGER.info(
+                    "Open3e did not advertise room device datapoints for %s",
+                    device.name,
+                )
 
             # Check if multiple devices have the same name
             duplicate_count = sum(1 for d in self.system_information.devices if d.name == device.name)
