@@ -2,12 +2,10 @@
   "config": {
     "step": {
       "user": {
-        "description": "Use Web UI add-on mode with the Open3e Develop add-on, or classic listener mode with an Open3e server that listens for MQTT commands.",
+        "description": "Please enter the topic and command topic for your Open3e server. Use the default if you haven't changed it.",
         "data": {
-          "connection_mode": "Connection mode",
           "mqtt_topic": "Open3e MQTT topic",
-          "mqtt_cmnd": "Open3e MQTT command topic",
-          "mqtt_discovery_prefix": "MQTT discovery prefix"
+          "mqtt_cmnd": "Open3e MQTT command topic"
         }
       }
     },

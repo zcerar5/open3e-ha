@@ -50,7 +50,16 @@ from ..capability.capability import Capability
 class SensorDataRetriever:
     """Retriever functions for MQTT sensor data."""
 
+    @staticmethod
+    def json_float(data: Any, key: str) -> float | None:
+        try:
+            return float(json_loads(data)[key])
+        except (KeyError, TypeError, ValueError):
+            return None
+
     ACTUAL = lambda data: float(json_loads(data)["Actual"])
+    ACTUAL_TEMP = lambda data: SensorDataRetriever.json_float(data, "ActualTemp")
+    ACTUAL_HUMIDITY = lambda data: SensorDataRetriever.json_float(data, "ActualHumidity")
     MINIMUM = lambda data: float(json_loads(data)["Minimum"])
     MAXIMUM = lambda data: float(json_loads(data)["Maximum"])
     AVERAGE = lambda data: float(json_loads(data)["Average"])
@@ -167,6 +176,58 @@ class Open3eDerivedSensorEntityDescription(
         to the outputs of data_retrievers. Can handle any number of parameters.
         The params need to aligned with poll_data_features.
         """
+
+
+ROOM_CURRENT_VALUE_FEATURES = (
+    Features.Temperature.RoomCurrentValue1,
+    Features.Temperature.RoomCurrentValue2,
+    Features.Temperature.RoomCurrentValue3,
+    Features.Temperature.RoomCurrentValue4,
+    Features.Temperature.RoomCurrentValue5,
+    Features.Temperature.RoomCurrentValue6,
+    Features.Temperature.RoomCurrentValue7,
+    Features.Temperature.RoomCurrentValue8,
+    Features.Temperature.RoomCurrentValue9,
+    Features.Temperature.RoomCurrentValue10,
+    Features.Temperature.RoomCurrentValue11,
+    Features.Temperature.RoomCurrentValue12,
+    Features.Temperature.RoomCurrentValue13,
+    Features.Temperature.RoomCurrentValue14,
+    Features.Temperature.RoomCurrentValue15,
+    Features.Temperature.RoomCurrentValue16,
+    Features.Temperature.RoomCurrentValue17,
+    Features.Temperature.RoomCurrentValue18,
+    Features.Temperature.RoomCurrentValue19,
+    Features.Temperature.RoomCurrentValue20,
+)
+
+
+def create_room_current_value_sensors() -> tuple[Open3eSensorEntityDescription, ...]:
+    sensors = []
+    for room_index, feature in enumerate(ROOM_CURRENT_VALUE_FEATURES, start=1):
+        sensors.extend((
+            Open3eSensorEntityDescription(
+                poll_data_features=[feature],
+                device_class=SensorDeviceClass.TEMPERATURE,
+                native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+                state_class=SensorStateClass.MEASUREMENT,
+                key=f"room{room_index}_current_temperature",
+                name=f"Room {room_index} temperature",
+                data_retriever=SensorDataRetriever.ACTUAL_TEMP,
+                required_device=Open3eDevices.Vitocal
+            ),
+            Open3eSensorEntityDescription(
+                poll_data_features=[feature],
+                device_class=SensorDeviceClass.HUMIDITY,
+                native_unit_of_measurement=PERCENTAGE,
+                state_class=SensorStateClass.MEASUREMENT,
+                key=f"room{room_index}_current_humidity",
+                name=f"Room {room_index} humidity",
+                data_retriever=SensorDataRetriever.ACTUAL_HUMIDITY,
+                required_device=Open3eDevices.Vitocal
+            ),
+        ))
+    return tuple(sensors)
 
 
 SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
@@ -1101,6 +1162,7 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_capabilities=[Capability.Room4Temperature],
         required_device=Open3eDevices.Vitocal
     ),
+    *create_room_current_value_sensors(),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Position.ExpansionValve1],
         device_class=SensorDeviceClass.POWER_FACTOR,

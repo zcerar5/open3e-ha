@@ -11,19 +11,7 @@ from homeassistant.helpers import selector
 from .api import (
     Open3eMqttClient
 )
-from .const import (
-    CONNECTION_MODE_CLASSIC,
-    CONNECTION_MODE_DEFAULT,
-    CONNECTION_MODE_KEY,
-    CONNECTION_MODE_WEBUI,
-    DOMAIN,
-    MQTT_CMD_DEFAULT,
-    MQTT_CMD_KEY,
-    MQTT_DISCOVERY_PREFIX_DEFAULT,
-    MQTT_DISCOVERY_PREFIX_KEY,
-    MQTT_TOPIC_DEFAULT,
-    MQTT_TOPIC_KEY,
-)
+from .const import DOMAIN, MQTT_CMD_KEY, MQTT_CMD_DEFAULT, MQTT_TOPIC_KEY, MQTT_TOPIC_DEFAULT
 from .errors import Open3eServerTimeoutError, Open3eServerUnavailableError, Open3eError
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,12 +34,7 @@ class Open3eFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             errors = {}
 
             try:
-                client = Open3eMqttClient(
-                    mqtt_topic=user_input[MQTT_TOPIC_KEY],
-                    mqtt_cmd=user_input[MQTT_CMD_KEY],
-                    connection_mode=user_input[CONNECTION_MODE_KEY],
-                    discovery_prefix=user_input[MQTT_DISCOVERY_PREFIX_KEY],
-                )
+                client = Open3eMqttClient(mqtt_topic=user_input[MQTT_TOPIC_KEY], mqtt_cmd=user_input[MQTT_CMD_KEY])
                 await client.async_check_availability(self.hass)
             except Open3eServerTimeoutError as exception:
                 _LOGGER.exception(exception)
@@ -70,15 +53,6 @@ class Open3eFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema({
                 vol.Required(
-                    CONNECTION_MODE_KEY,
-                    default=(user_input or {CONNECTION_MODE_KEY: CONNECTION_MODE_DEFAULT}).get(
-                        CONNECTION_MODE_KEY, vol.UNDEFINED
-                    ),
-                ): vol.In({
-                    CONNECTION_MODE_WEBUI: "Open3e Web UI add-on",
-                    CONNECTION_MODE_CLASSIC: "Classic Open3e listener",
-                }),
-                vol.Required(
                     "mqtt_topic",
                     default=(user_input or {MQTT_TOPIC_KEY: MQTT_TOPIC_DEFAULT}).get(MQTT_TOPIC_KEY, vol.UNDEFINED),
                 ): selector.TextSelector(
@@ -89,16 +63,6 @@ class Open3eFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     "mqtt_cmnd",
                     default=(user_input or {MQTT_CMD_KEY: MQTT_CMD_DEFAULT}).get(MQTT_CMD_KEY, vol.UNDEFINED),
-                ): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.TEXT
-                    )
-                ),
-                vol.Required(
-                    MQTT_DISCOVERY_PREFIX_KEY,
-                    default=(user_input or {MQTT_DISCOVERY_PREFIX_KEY: MQTT_DISCOVERY_PREFIX_DEFAULT}).get(
-                        MQTT_DISCOVERY_PREFIX_KEY, vol.UNDEFINED
-                    ),
                 ): selector.TextSelector(
                     selector.TextSelectorConfig(
                         type=selector.TextSelectorType.TEXT
