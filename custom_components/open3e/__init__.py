@@ -18,7 +18,15 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 from .api import Open3eMqttClient
-from .const import MQTT_CMD_KEY, MQTT_TOPIC_KEY, DOMAIN
+from .const import (
+    CONNECTION_MODE_DEFAULT,
+    CONNECTION_MODE_KEY,
+    MQTT_CMD_KEY,
+    MQTT_DISCOVERY_PREFIX_DEFAULT,
+    MQTT_DISCOVERY_PREFIX_KEY,
+    MQTT_TOPIC_KEY,
+    DOMAIN,
+)
 from .ha_data import Open3eData, Open3eDataConfigEntry, Open3eDataUpdateCoordinator
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -44,7 +52,9 @@ async def async_setup_entry(
     """Set up this integration using UI."""
     client = Open3eMqttClient(
         mqtt_topic=entry.data[MQTT_TOPIC_KEY],
-        mqtt_cmd=entry.data[MQTT_CMD_KEY]
+        mqtt_cmd=entry.data[MQTT_CMD_KEY],
+        connection_mode=entry.data.get(CONNECTION_MODE_KEY, CONNECTION_MODE_DEFAULT),
+        discovery_prefix=entry.data.get(MQTT_DISCOVERY_PREFIX_KEY, MQTT_DISCOVERY_PREFIX_DEFAULT),
     )
 
     coordinator = Open3eDataUpdateCoordinator(

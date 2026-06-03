@@ -15,6 +15,7 @@ from .definitions.switches import Open3eSwitchEntityDescription, SWITCHES
 from .entity import Open3eEntity
 from .ha_data import Open3eDataConfigEntry
 from .util import map_devices_to_entities
+from .webui_entity import Open3eWebUiSwitch
 
 
 async def async_setup_entry(
@@ -22,6 +23,13 @@ async def async_setup_entry(
         entry: Open3eDataConfigEntry,
         async_add_entities: AddEntitiesCallback,
 ) -> None:
+    if entry.runtime_data.coordinator.is_webui_mode:
+        async_add_entities(
+            Open3eWebUiSwitch(entity)
+            for entity in entry.runtime_data.coordinator.webui_entities_for_component("switch")
+        )
+        return
+
     device_number_map = map_devices_to_entities(
         entry.runtime_data.coordinator,
         SWITCHES

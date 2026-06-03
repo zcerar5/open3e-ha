@@ -1,42 +1,46 @@
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/MojoOli/open3e-ha?style=flat-square)
-![Issues open](https://img.shields.io/github/stars/MojoOli/open3e-ha?style=flat-square&color=orange&label=Stars)
-![commit_activity](https://img.shields.io/github/issues/MojoOli/open3e-ha?color=green&label=Issues&style=flat-square)
-# Open3e HomeAssistant Integration
+# Open3e Home Assistant Integration
 
-Automatic recognition of Viessmann devices via the Open3e Server and setup of available entities.
+Fork of the Open3e Home Assistant integration adapted for the Open3e Develop Web UI add-on.
 
-<img height="500" src="https://github.com/user-attachments/assets/02e14d18-757c-44f6-b413-0be74dcbb31a" /> <img height="500" src="https://github.com/user-attachments/assets/d7a38dbe-61e5-464e-a2fa-b4a120a3cfff" />
-
-#### Supported Devices
-
-- [x] Vitocal
-- [x] Vitoair
-- [x] Vitodens
-- [x] Vitocharge
+The integration keeps the curated base entity set from the original HACS integration and adds Open3e develop room-current values for per-room temperature and humidity.
 
 ## Installation
 
-**This integration needs the Open3e server in order to communicate with the devices. So make sure its installed and
-running in listen mode.**
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=zcerar5&repository=open3e-ha&category=integration)
 
-<details>
-<summary>Open3e Server Installation Instructions</summary>
+Add this repository to HACS as a custom integration repository:
 
-There are various ways to run the Open3e server that communicates with this integration. The preferred way is the [HA Addon](https://github.com/flecke-m/ha-addons/tree/main/open3e).
+```text
+https://github.com/zcerar5/open3e-ha
+```
 
-1. Install the HA Addon
-2. Make sure your Open3e server runs in listen mode and is connected to MQTT (can all be configured in the config file). 
-3. Proceed with installing this integration via the button below.
-</details>
+## Open3e Develop Web UI Mode
 
+Use this mode with the Open3e Develop add-on from:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=MojoOli&repository=open3e-ha&category=integration)
+```text
+https://github.com/zcerar5/ha-addons
+```
 
-## Features
+Default setup values:
 
-- Connects to Open3e via MQTT
-- Automatic device discovery and entity setup
-- Integrates sensors, climate controls, automations, etc.
-- Automatic data refreshing
-- Varies data refreshing interval based on integration and enabled entities
-- German & English language support
+| Field | Value |
+| --- | --- |
+| Connection mode | Open3e Web UI add-on |
+| Open3e MQTT topic | `open3e_develop` |
+| Open3e MQTT command topic | `open3e_develop/cmnd` |
+| MQTT discovery prefix | `homeassistant` |
+
+The integration reads retained MQTT discovery records published by the Web UI add-on, but only creates entities from a curated list:
+
+- the original Open3e HACS feature set
+- room-current values from Open3e develop DIDs `1886`, `1889`, `1892`, through `1943`
+- room-current subfields `ActualTemp` and `ActualHumidity`
+
+## Classic Listener Mode
+
+Classic mode is still available for an Open3e server running with the MQTT listener command topic, such as `open3e/cmnd`.
+
+## Notes
+
+The Web UI add-on must have relevant datapoints selected and must publish Home Assistant MQTT discovery at least once so this integration can learn the correct MQTT state topics.

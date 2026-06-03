@@ -27,6 +27,7 @@ from .definitions.subfeatures.hvac_mode import HvacMode
 from .definitions.subfeatures.ventilation_mode import VentilationMode
 from .definitions.subfeatures.vitoair_quick_mode import VitoairQuickMode
 from .errors import Open3eCoordinatorUpdateFailed
+from .webui_filter import filter_curated_webui_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,6 +90,15 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
         self.__endpoints = {}
         self.__server_available = None
 
+    @property
+    def is_webui_mode(self) -> bool:
+        return self.__client.is_webui_mode
+
+    def webui_entities_for_component(self, component: str):
+        return filter_curated_webui_entities(
+            self.__client.webui_entities_for_component(component)
+        )
+
     async def _async_setup(self):
         """Set up the coordinator
 
@@ -105,6 +115,9 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
         self.system_information = await self.__client.async_get_system_information(self.hass)
+        if self.is_webui_mode:
+            return
+
         for device in self.system_information.devices:
 
             # Check if multiple devices have the same name

@@ -21,9 +21,17 @@ from custom_components.open3e.definitions.subfeatures.program import Program
 from custom_components.open3e.definitions.subfeatures.smart_grid_temperature_offsets import SmartGridTemperatureOffsets
 from custom_components.open3e.definitions.subfeatures.temperature_cooling import TemperatureCooling
 from .capability.capability import DEVICE_CAPABILITIES, CapabilityFeature
-from .const import MQTT_SYSTEM_TOPIC, MQTT_SYSTEM_PAYLOAD
+from .const import (
+    CONNECTION_MODE_CLASSIC,
+    CONNECTION_MODE_DEFAULT,
+    CONNECTION_MODE_WEBUI,
+    MQTT_DISCOVERY_PREFIX_DEFAULT,
+    MQTT_SYSTEM_PAYLOAD,
+    MQTT_SYSTEM_TOPIC,
+)
 from .definitions.devices import Open3eDevices
 from .definitions.open3e_data import Open3eDataSystemInformation, Open3eDataDeviceFeature, Open3eDataDevice
+from .definitions.webui_discovery import Open3eWebUiDiscoveryEntity
 from .definitions.subfeatures.buffer_mode import BufferMode
 from .definitions.subfeatures.dhw_hysteresis import DhwHysteresis
 from .definitions.subfeatures.heating_curve import HeatingCurve
@@ -40,15 +48,34 @@ class Open3eMqttClient:
 
     __mqtt_cmd: str
     __mqtt_topic: str
+    __connection_mode: str
+    __discovery_prefix: str
+    __webui_entities: dict[str, Open3eWebUiDiscoveryEntity]
     """Only used to return availability"""
 
     def __init__(
             self,
             mqtt_topic: str,
-            mqtt_cmd: str
+            mqtt_cmd: str,
+            connection_mode: str = CONNECTION_MODE_DEFAULT,
+            discovery_prefix: str = MQTT_DISCOVERY_PREFIX_DEFAULT
     ) -> None:
         self.__mqtt_topic = mqtt_topic
         self.__mqtt_cmd = mqtt_cmd
+        self.__connection_mode = connection_mode
+        self.__discovery_prefix = discovery_prefix
+        self.__webui_entities = {}
+
+    @property
+    def is_webui_mode(self) -> bool:
+        return self.__connection_mode == CONNECTION_MODE_WEBUI
+
+    def webui_entities_for_component(self, component: str) -> list[Open3eWebUiDiscoveryEntity]:
+        return [
+            entity
+            for entity in self.__webui_entities.values()
+            if entity.component == component
+        ]
 
     async def async_check_availability(self, hass: HomeAssistant) -> bool:
         """
@@ -107,6 +134,10 @@ class Open3eMqttClient:
         """
         Request system information via MQTT and return it.
         """
+        if self.is_webui_mode:
+            await self.__collect_webui_discovery(hass)
+            return Open3eDataSystemInformation(devices=[])
+
         event = asyncio.Event()
         system_information: Open3eDataSystemInformation | None = None
 
@@ -151,6 +182,9 @@ class Open3eMqttClient:
                 subscription()
 
     async def async_request_data(self, hass: HomeAssistant, device_features: dict[int, list[int]]):
+        if self.is_webui_mode:
+            return
+
         try:
             for device in device_features.keys():
                 data = ",".join(map(str, device_features[device]))
@@ -159,6 +193,49 @@ class Open3eMqttClient:
 
         except Exception as exception:
             raise Open3eError(exception)
+
+    async def __collect_webui_discovery(self, hass: HomeAssistant):
+        """Collect retained MQTT discovery configs published by the Web UI add-on."""
+        self.__webui_entities = {}
+        topic = f"{self.__discovery_prefix}/+/+/config"
+        prefix = f"{self.__mqtt_topic}/"
+
+        def message_callback(message: ReceiveMessage):
+            if not message.payload:
+                return
+
+            try:
+                payload = json_loads(message.payload)
+            except ValueError:
+                return
+
+            topic_parts = message.topic.split("/")
+            if len(topic_parts) < 4:
+                return
+
+            component = topic_parts[1]
+            object_id = topic_parts[2]
+            entity = Open3eWebUiDiscoveryEntity.from_discovery_payload(component, object_id, payload)
+            if entity is None or not entity.state_topic.startswith(prefix):
+                return
+
+            self.__webui_entities[entity.unique_id] = entity
+
+        subscription = None
+        try:
+            _LOGGER.debug("Collecting Open3e Web UI MQTT discovery messages from %s", topic)
+            subscription = await mqtt.async_subscribe(
+                hass=hass,
+                topic=topic,
+                msg_callback=message_callback
+            )
+            await asyncio.sleep(2)
+            _LOGGER.info("Collected %s Open3e Web UI MQTT discovery messages", len(self.__webui_entities))
+        except Exception as exc:
+            raise Open3eError(exc)
+        finally:
+            if subscription:
+                subscription()
 
     async def async_set_program_temperature(
             self,

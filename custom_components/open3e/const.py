@@ -2,10 +2,17 @@
 
 DOMAIN = "open3e"
 
+CONNECTION_MODE_KEY = "connection_mode"
+CONNECTION_MODE_CLASSIC = "classic"
+CONNECTION_MODE_WEBUI = "webui"
+CONNECTION_MODE_DEFAULT = CONNECTION_MODE_WEBUI
+
 MQTT_TOPIC_KEY = "mqtt_topic"
-MQTT_TOPIC_DEFAULT = "open3e"
+MQTT_TOPIC_DEFAULT = "open3e_develop"
 MQTT_CMD_KEY = "mqtt_cmnd"
-MQTT_CMD_DEFAULT = "open3e/cmnd"
+MQTT_CMD_DEFAULT = "open3e_develop/cmnd"
+MQTT_DISCOVERY_PREFIX_KEY = "mqtt_discovery_prefix"
+MQTT_DISCOVERY_PREFIX_DEFAULT = "homeassistant"
 MQTT_SYSTEM_TOPIC = "system"
 MQTT_SYSTEM_PAYLOAD = '{"mode":"system"}'
 
