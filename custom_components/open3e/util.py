@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Iterable, Dict, List
 
 from custom_components.open3e import Open3eDataUpdateCoordinator
+from custom_components.open3e.definitions.devices import Open3eDevices
 from custom_components.open3e.definitions.entity_description import Open3eEntityDescription
 from custom_components.open3e.definitions.open3e_data import Open3eDataDevice
 
@@ -18,8 +19,14 @@ def map_devices_to_entities(
 
     for device in coordinator.system_information.devices:
         device_feature_ids = {f.id for f in device.features}
+        is_backend_gateway = device.name == Open3eDevices.BackendGateway.display_name
 
         for entity in entities:
+            # BACKENDGATEWAY advertises ViCare room datapoints, but also many generic
+            # IDs that would otherwise create duplicate entities.
+            if is_backend_gateway and entity.required_device != Open3eDevices.BackendGateway:
+                continue
+
             # Skip if required_device is set and doesn't match
             if entity.required_device and entity.required_device.display_name != device.name:
                 continue

@@ -5,7 +5,7 @@ Fork of the Open3e Home Assistant integration for the original Open3e MQTT liste
 This keeps the original device and entity categorisation, and adds room temperature and humidity sensors for:
 
 - Open3e room-current DIDs `1886`, `1889`, `1892`, through `1943`
-- ViCare/ZigBee current-value DIDs `2086`, `2089`, `2092`, through `2143`, and `2262`, `2265`, through `2319`
+- ViCare/ZigBee current-value DIDs `2086`, `2089`, `2092`, through `2143`, and `2262`, `2265`, through `2319` from the Open3e `BACKENDGATEWAY` device
 
 <img height="500" src="https://github.com/user-attachments/assets/02e14d18-757c-44f6-b413-0be74dcbb31a" /> <img height="500" src="https://github.com/user-attachments/assets/d7a38dbe-61e5-464e-a2fa-b4a120a3cfff" />
 

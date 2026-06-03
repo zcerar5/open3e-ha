@@ -265,7 +265,7 @@ def create_vicare_room_device_sensors() -> tuple[Open3eSensorEntityDescription, 
                 key=f"vicare_room_device_{room_index}_temperature",
                 name=f"ViCare room device {room_index} temperature",
                 data_retriever=SensorDataRetriever.ROOM_TEMPERATURE,
-                required_device=Open3eDevices.Vitocal
+                required_device=Open3eDevices.BackendGateway
             ),
             Open3eSensorEntityDescription(
                 poll_data_features=[feature],
@@ -275,7 +275,7 @@ def create_vicare_room_device_sensors() -> tuple[Open3eSensorEntityDescription, 
                 key=f"vicare_room_device_{room_index}_humidity",
                 name=f"ViCare room device {room_index} humidity",
                 data_retriever=SensorDataRetriever.ROOM_HUMIDITY,
-                required_device=Open3eDevices.Vitocal
+                required_device=Open3eDevices.BackendGateway
             ),
         ))
     return tuple(sensors)

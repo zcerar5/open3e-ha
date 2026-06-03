@@ -13,6 +13,7 @@ class Open3eDevices(Device, Enum):
     Vitoair = ("VCU", "Vitoair")
     Vitodens = ("HMU", "Vitodens")
     Vitocharge = ("EMCU", "Vitocharge")
+    BackendGateway = ("BACKENDGATEWAY", "ViCare")
 
     def __init__(self, id: str, display_name: str):
         object.__setattr__(self, "id", id)
