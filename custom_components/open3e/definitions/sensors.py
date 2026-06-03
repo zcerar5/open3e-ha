@@ -11,7 +11,7 @@ from homeassistant.util.json import json_loads
 
 from .devices import Open3eDevices
 from .entity_description import Open3eEntityDescription
-from .features import Features
+from .features import Feature, Features
 from .subfeatures.connection_status import ConnectionStatus, get_connection_status
 from .subfeatures.domestic_hot_water_operation_state import (
     DomesticHotWaterOperationState,
@@ -57,9 +57,24 @@ class SensorDataRetriever:
         except (KeyError, TypeError, ValueError):
             return None
 
+    @staticmethod
+    def json_first_float(data: Any, *keys: str) -> float | None:
+        try:
+            decoded = json_loads(data)
+        except (TypeError, ValueError):
+            return None
+
+        for key in keys:
+            try:
+                return float(decoded[key])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+        return None
+
     ACTUAL = lambda data: float(json_loads(data)["Actual"])
-    ACTUAL_TEMP = lambda data: SensorDataRetriever.json_float(data, "ActualTemp")
-    ACTUAL_HUMIDITY = lambda data: SensorDataRetriever.json_float(data, "ActualHumidity")
+    ROOM_TEMPERATURE = lambda data: SensorDataRetriever.json_first_float(data, "ActualTemp", "ActualTemperature")
+    ROOM_HUMIDITY = lambda data: SensorDataRetriever.json_first_float(data, "ActualHumidity", "Humidity")
     MINIMUM = lambda data: float(json_loads(data)["Minimum"])
     MAXIMUM = lambda data: float(json_loads(data)["Maximum"])
     AVERAGE = lambda data: float(json_loads(data)["Average"])
@@ -201,6 +216,14 @@ ROOM_CURRENT_VALUE_FEATURES = (
     Features.Temperature.RoomCurrentValue20,
 )
 
+VICARE_ROOM_DEVICE_CURRENT_VALUE_FEATURES = tuple(
+    Feature(id=feature_id, refresh_interval=30)
+    for feature_id in (
+        *range(2086, 2144, 3),
+        *range(2262, 2320, 3),
+    )
+)
+
 
 def create_room_current_value_sensors() -> tuple[Open3eSensorEntityDescription, ...]:
     sensors = []
@@ -213,7 +236,7 @@ def create_room_current_value_sensors() -> tuple[Open3eSensorEntityDescription, 
                 state_class=SensorStateClass.MEASUREMENT,
                 key=f"room{room_index}_current_temperature",
                 name=f"Room {room_index} temperature",
-                data_retriever=SensorDataRetriever.ACTUAL_TEMP,
+                data_retriever=SensorDataRetriever.ROOM_TEMPERATURE,
                 required_device=Open3eDevices.Vitocal
             ),
             Open3eSensorEntityDescription(
@@ -223,7 +246,35 @@ def create_room_current_value_sensors() -> tuple[Open3eSensorEntityDescription, 
                 state_class=SensorStateClass.MEASUREMENT,
                 key=f"room{room_index}_current_humidity",
                 name=f"Room {room_index} humidity",
-                data_retriever=SensorDataRetriever.ACTUAL_HUMIDITY,
+                data_retriever=SensorDataRetriever.ROOM_HUMIDITY,
+                required_device=Open3eDevices.Vitocal
+            ),
+        ))
+    return tuple(sensors)
+
+
+def create_vicare_room_device_sensors() -> tuple[Open3eSensorEntityDescription, ...]:
+    sensors = []
+    for room_index, feature in enumerate(VICARE_ROOM_DEVICE_CURRENT_VALUE_FEATURES, start=1):
+        sensors.extend((
+            Open3eSensorEntityDescription(
+                poll_data_features=[feature],
+                device_class=SensorDeviceClass.TEMPERATURE,
+                native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+                state_class=SensorStateClass.MEASUREMENT,
+                key=f"vicare_room_device_{room_index}_temperature",
+                name=f"ViCare room device {room_index} temperature",
+                data_retriever=SensorDataRetriever.ROOM_TEMPERATURE,
+                required_device=Open3eDevices.Vitocal
+            ),
+            Open3eSensorEntityDescription(
+                poll_data_features=[feature],
+                device_class=SensorDeviceClass.HUMIDITY,
+                native_unit_of_measurement=PERCENTAGE,
+                state_class=SensorStateClass.MEASUREMENT,
+                key=f"vicare_room_device_{room_index}_humidity",
+                name=f"ViCare room device {room_index} humidity",
+                data_retriever=SensorDataRetriever.ROOM_HUMIDITY,
                 required_device=Open3eDevices.Vitocal
             ),
         ))
@@ -1163,6 +1214,7 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_device=Open3eDevices.Vitocal
     ),
     *create_room_current_value_sensors(),
+    *create_vicare_room_device_sensors(),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Position.ExpansionValve1],
         device_class=SensorDeviceClass.POWER_FACTOR,
