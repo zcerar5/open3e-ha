@@ -173,6 +173,13 @@ class SensorDataDeriver:
 
         return round(min(total_thermal / total_electric, 10.0), 1)
 
+    @staticmethod
+    def calculate_delta_t(supply: float | None, returns: float | None) -> float | None:
+        if supply is None or returns is None:
+            return None
+
+        return round(supply - returns, 1)
+
 
 @dataclass(frozen=True)
 class Open3eSensorEntityDescription(
@@ -2632,6 +2639,18 @@ DERIVED_SENSORS: tuple[Open3eDerivedSensorEntityDescription, ...] = (
     ### VITOCAL ###
     ###############
 
+    Open3eDerivedSensorEntityDescription(
+        poll_data_features=[Features.Temperature.Flow, Features.Temperature.Return],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement="K",
+        state_class=SensorStateClass.MEASUREMENT,
+        key="supply_return_delta_t",
+        translation_key="supply_return_delta_t",
+        icon="mdi:delta",
+        data_retrievers=[SensorDataRetriever.ACTUAL] * 2,
+        compute_value=SensorDataDeriver.calculate_delta_t,
+        required_device=Open3eDevices.Vitocal
+    ),
     Open3eDerivedSensorEntityDescription(
         poll_data_features=[Features.Energy.CentralHeating, Features.Energy.Cooling, Features.Energy.DomesticHotWater],
         device_class=SensorDeviceClass.ENERGY,

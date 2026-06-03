@@ -31,6 +31,9 @@
       "return_temperature": {
         "name": "Return temperature"
       },
+      "supply_return_delta_t": {
+        "name": "Supply/return deltaT"
+      },
       "domestic_hot_water_temperature": {
         "name": "Domestic hot water temperature"
       },
