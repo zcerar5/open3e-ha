@@ -72,9 +72,29 @@ class SensorDataRetriever:
 
         return None
 
+    @staticmethod
+    def vicare_climate_sensor_float(data: Any, *keys: str) -> float | None:
+        try:
+            decoded = json_loads(data)
+        except (TypeError, ValueError):
+            return None
+
+        if decoded.get("ViCareDevice", {}).get("ID") != 1:
+            return None
+
+        for key in keys:
+            try:
+                return float(decoded[key])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+        return None
+
     ACTUAL = lambda data: float(json_loads(data)["Actual"])
     ROOM_TEMPERATURE = lambda data: SensorDataRetriever.json_first_float(data, "ActualTemp", "ActualTemperature")
     ROOM_HUMIDITY = lambda data: SensorDataRetriever.json_first_float(data, "ActualHumidity", "Humidity")
+    VICARE_ROOM_TEMPERATURE = lambda data: SensorDataRetriever.vicare_climate_sensor_float(data, "ActualTemperature")
+    VICARE_ROOM_HUMIDITY = lambda data: SensorDataRetriever.vicare_climate_sensor_float(data, "Humidity")
     MINIMUM = lambda data: float(json_loads(data)["Minimum"])
     MAXIMUM = lambda data: float(json_loads(data)["Maximum"])
     AVERAGE = lambda data: float(json_loads(data)["Average"])
@@ -264,7 +284,7 @@ def create_vicare_room_device_sensors() -> tuple[Open3eSensorEntityDescription, 
                 state_class=SensorStateClass.MEASUREMENT,
                 key=f"vicare_room_device_{room_index}_temperature",
                 name=f"ViCare room device {room_index} temperature",
-                data_retriever=SensorDataRetriever.ROOM_TEMPERATURE,
+                data_retriever=SensorDataRetriever.VICARE_ROOM_TEMPERATURE,
                 required_device=Open3eDevices.BackendGateway
             ),
             Open3eSensorEntityDescription(
@@ -274,7 +294,7 @@ def create_vicare_room_device_sensors() -> tuple[Open3eSensorEntityDescription, 
                 state_class=SensorStateClass.MEASUREMENT,
                 key=f"vicare_room_device_{room_index}_humidity",
                 name=f"ViCare room device {room_index} humidity",
-                data_retriever=SensorDataRetriever.ROOM_HUMIDITY,
+                data_retriever=SensorDataRetriever.VICARE_ROOM_HUMIDITY,
                 required_device=Open3eDevices.BackendGateway
             ),
         ))
