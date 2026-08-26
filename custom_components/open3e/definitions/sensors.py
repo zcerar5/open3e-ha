@@ -79,7 +79,9 @@ class SensorDataRetriever:
         except (TypeError, ValueError):
             return None
 
-        if decoded.get("ViCareDevice", {}).get("ID") != 1:
+        # 1 = climate sensor, 8 = Vitotrol room remote (also reports
+        # temperature and humidity)
+        if decoded.get("ViCareDevice", {}).get("ID") not in (1, 8):
             return None
 
         for key in keys:
