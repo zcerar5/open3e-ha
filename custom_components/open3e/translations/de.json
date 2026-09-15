@@ -659,6 +659,12 @@
       "circuit2_frost_protection_config": {
         "name": "Heizkreis 2 Frostschutz Konfiguration"
       },
+      "humidity_protection_circuit_1_raw": {
+        "name": "Feuchteanbauschalter Heiz-/Kühlkreis 1 Rohwert"
+      },
+      "humidity_protection_circuit_2_raw": {
+        "name": "Feuchteanbauschalter Heiz-/Kühlkreis 2 Rohwert"
+      },
       "circuit2_pump_status": {
         "name": "Heizkreis 2 Pumpe Status"
       },
@@ -832,6 +838,12 @@
       },
       "heat_pump_frost_protection": {
         "name": "Frostschutz Wärmepumpe"
+      },
+      "humidity_protection_circuit_1": {
+        "name": "Feuchteanbauschalter Heiz-/Kühlkreis 1"
+      },
+      "humidity_protection_circuit_2": {
+        "name": "Feuchteanbauschalter Heiz-/Kühlkreis 2"
       },
       "ventilation_outside_air_bypass": {
         "name": "Außenluft-Bypass",
