@@ -1954,6 +1954,30 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_capabilities=[Capability.Circuit2],
         required_device=Open3eDevices.Vitocal
     ),
+
+    # DID 1843/1844: MixerOne/TwoCircuitHumidityProtection, raw value (meaning not confirmed yet)
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.MixerOneCircuitHumidityProtection],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:water-percent",
+        key="humidity_protection_circuit_1_raw",
+        translation_key="humidity_protection_circuit_1_raw",
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.RAWSTR,
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.MixerTwoCircuitHumidityProtection],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:water-percent",
+        key="humidity_protection_circuit_2_raw",
+        translation_key="humidity_protection_circuit_2_raw",
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.RAWSTR,
+        required_capabilities=[Capability.Circuit2],
+        required_device=Open3eDevices.Vitocal
+    ),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Misc.CentralHeatingOneCircuitName],
         entity_category=EntityCategory.DIAGNOSTIC,

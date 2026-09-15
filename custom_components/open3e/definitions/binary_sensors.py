@@ -8,6 +8,7 @@ from .devices import Open3eDevices
 from .entity_description import Open3eEntityDescription
 from .features import Features
 from .subfeatures.domestic_hot_water_operation_state import is_domestic_hot_water_operation_state_active
+from .subfeatures.info_dtc_list import InfoDtc, is_info_dtc_active
 from ..capability.capability import Capability
 
 
@@ -254,6 +255,28 @@ BINARY_SENSORS: tuple[Open3eBinarySensorEntityDescription, ...] = (
         translation_key="heat_pump_frost_protection",
         icon="mdi:snowflake-melt",
         data_transform=lambda data: int(data) > 0,
+        required_device=Open3eDevices.Vitocal
+    ),
+
+    # DID 259: InfoDtcList, active info messages I.121/I.122 (Feuchteanbauschalter)
+    Open3eBinarySensorEntityDescription(
+        device_class=BinarySensorDeviceClass.MOISTURE,
+        poll_data_features=[Features.Misc.InfoDtcList],
+        key="humidity_protection_circuit_1",
+        translation_key="humidity_protection_circuit_1",
+        icon="mdi:water-percent",
+        data_transform=lambda data: is_info_dtc_active(data, InfoDtc.MIXER_ONE_CIRCUIT_HUMIDITY_PROTECTION_ACTIVATED),
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eBinarySensorEntityDescription(
+        device_class=BinarySensorDeviceClass.MOISTURE,
+        poll_data_features=[Features.Misc.InfoDtcList],
+        key="humidity_protection_circuit_2",
+        translation_key="humidity_protection_circuit_2",
+        icon="mdi:water-percent",
+        data_transform=lambda data: is_info_dtc_active(data, InfoDtc.MIXER_TWO_CIRCUIT_HUMIDITY_PROTECTION_ACTIVATED),
+        required_capabilities=[Capability.Circuit2],
         required_device=Open3eDevices.Vitocal
     ),
 

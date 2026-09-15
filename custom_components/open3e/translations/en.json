@@ -659,6 +659,12 @@
       "circuit2_frost_protection_config": {
         "name": "Circuit 2 frost protection configuration"
       },
+      "humidity_protection_circuit_1_raw": {
+        "name": "Humidity protection circuit 1 raw value"
+      },
+      "humidity_protection_circuit_2_raw": {
+        "name": "Humidity protection circuit 2 raw value"
+      },
       "circuit2_pump_status": {
         "name": "Heating circuit 2 pump status"
       },
@@ -832,6 +838,12 @@
       },
       "heat_pump_frost_protection": {
         "name": "Heat pump frost protection"
+      },
+      "humidity_protection_circuit_1": {
+        "name": "Humidity protection circuit 1"
+      },
+      "humidity_protection_circuit_2": {
+        "name": "Humidity protection circuit 2"
       },
       "ventilation_outside_air_bypass": {
         "name": "Outside air bypass",
