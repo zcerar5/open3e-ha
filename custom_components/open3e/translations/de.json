@@ -744,6 +744,49 @@
           "grid_lock": "EVU-Sperre"
         }
       },
+      "status_dtc_list": {
+        "name": "Statusmeldungen"
+      },
+      "warning_dtc_list": {
+        "name": "Warnungen"
+      },
+      "info_dtc_list": {
+        "name": "Infomeldungen"
+      },
+      "defrost_phase": {
+        "name": "Abtauphase",
+        "state": {
+          "none": "Keine",
+          "requested": "Angefordert",
+          "preparing": "Vorbereitung",
+          "defrosting": "Abtauen",
+          "finishing": "Abschluss"
+        }
+      },
+      "electric_heater_stage": {
+        "name": "Heizstab Stufe",
+        "state": {
+          "off": "Aus",
+          "stage_1": "Stufe 1",
+          "stage_2": "Stufe 2",
+          "stage_3": "Stufe 3"
+        }
+      },
+      "heat_pump_activity": {
+        "name": "Wärmepumpe Aktivität",
+        "state": {
+          "off": "Aus",
+          "standby": "Bereitschaft",
+          "heating": "Heizen",
+          "hot_water": "Warmwasser",
+          "cooling": "Kühlen",
+          "defrost": "Abtauen",
+          "frost_protection": "Frostschutz",
+          "electric_heater": "Heizstab",
+          "grid_lock": "EVU-Sperre",
+          "manual": "Manuell"
+        }
+      },
       "smart_grid_ready_consolidator": {
         "name": "SmartGrid Ready Status",
         "state": {
@@ -844,6 +887,18 @@
       },
       "humidity_protection_circuit_2": {
         "name": "Feuchteanbauschalter Heiz-/Kühlkreis 2"
+      },
+      "defrost_active": {
+        "name": "Abtauung"
+      },
+      "frost_protection_active": {
+        "name": "Frostschutz aktiv"
+      },
+      "utility_lock": {
+        "name": "EVU-Sperre"
+      },
+      "crankcase_heater": {
+        "name": "Kurbelwannenheizung Verdichter"
       },
       "ventilation_outside_air_bypass": {
         "name": "Außenluft-Bypass",

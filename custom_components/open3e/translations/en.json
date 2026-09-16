@@ -744,6 +744,49 @@
           "grid_lock": "Grid-lock"
         }
       },
+      "status_dtc_list": {
+        "name": "Status messages"
+      },
+      "warning_dtc_list": {
+        "name": "Warnings"
+      },
+      "info_dtc_list": {
+        "name": "Info messages"
+      },
+      "defrost_phase": {
+        "name": "Defrost phase",
+        "state": {
+          "none": "None",
+          "requested": "Requested",
+          "preparing": "Preparing",
+          "defrosting": "Defrosting",
+          "finishing": "Finishing"
+        }
+      },
+      "electric_heater_stage": {
+        "name": "Electric heater stage",
+        "state": {
+          "off": "Off",
+          "stage_1": "Stage 1",
+          "stage_2": "Stage 2",
+          "stage_3": "Stage 3"
+        }
+      },
+      "heat_pump_activity": {
+        "name": "Heat pump activity",
+        "state": {
+          "off": "Off",
+          "standby": "Standby",
+          "heating": "Heating",
+          "hot_water": "Hot water",
+          "cooling": "Cooling",
+          "defrost": "Defrost",
+          "frost_protection": "Frost protection",
+          "electric_heater": "Electric heater",
+          "grid_lock": "Utility lock",
+          "manual": "Manual"
+        }
+      },
       "smart_grid_ready_consolidator": {
         "name": "SmartGrid ready status",
         "state": {
@@ -844,6 +887,18 @@
       },
       "humidity_protection_circuit_2": {
         "name": "Humidity protection circuit 2"
+      },
+      "defrost_active": {
+        "name": "Defrost"
+      },
+      "frost_protection_active": {
+        "name": "Frost protection active"
+      },
+      "utility_lock": {
+        "name": "Utility lock (EVU)"
+      },
+      "crankcase_heater": {
+        "name": "Compressor crankcase heater"
       },
       "ventilation_outside_air_bypass": {
         "name": "Outside air bypass",
