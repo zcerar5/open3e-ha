@@ -1,7 +1,7 @@
 from enum import IntEnum
 from typing import Any
 
-from homeassistant.util.json import json_loads
+from .dtc_list import get_dtc_ids
 
 
 class InfoDtc(IntEnum):
@@ -18,15 +18,7 @@ def get_active_info_dtc_ids(data: Any) -> set[int] | None:
 
     Returns None if the payload is not a valid InfoDtcList.
     """
-    try:
-        active_ids: set[int] = set()
-        for entry in json_loads(data)["ListEntries"]:
-            info = entry["Info"]
-            # O3EEnum payload {"ID": 121, "Text": "..."}; a plain ID is accepted as well
-            active_ids.add(int(info["ID"] if isinstance(info, dict) else info))
-        return active_ids
-    except (TypeError, ValueError, KeyError):
-        return None
+    return get_dtc_ids(data, "Info")
 
 
 def is_info_dtc_active(data: Any, info: InfoDtc) -> bool | None:

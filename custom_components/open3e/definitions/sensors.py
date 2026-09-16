@@ -13,6 +13,7 @@ from .devices import Open3eDevices
 from .entity_description import Open3eEntityDescription
 from .features import Feature, Features
 from .subfeatures.connection_status import ConnectionStatus, get_connection_status
+from .subfeatures.dtc_list import get_dtc_list_state
 from .subfeatures.domestic_hot_water_operation_state import (
     DomesticHotWaterOperationState,
     get_domestic_hot_water_operation_state,
@@ -25,6 +26,12 @@ from .subfeatures.energy_management_mode import ENERGY_MANAGEMENT_MODES_MAP, Ene
 from .subfeatures.four_three_way_valve_position import (
     FourThreeWayValvePosition,
     get_four_three_way_valve_position,
+)
+from .subfeatures.heat_pump_activity import (
+    HeatPumpActivity,
+    compute_heat_pump_activity,
+    get_enum_id,
+    is_power_state_on,
 )
 from .subfeatures.legionella_protection import LegionellaProtectionWeekday
 from .subfeatures.noise_reduction_mode import (
@@ -40,6 +47,13 @@ from .subfeatures.smart_grid_feature_selection import (
     get_smart_grid_feature_selection,
 )
 from .subfeatures.smart_grid_ready_status import SMART_GRID_READY_STATUS_MAP, SmartGridReadyStatus
+from .subfeatures.status_dtc_list import (
+    DefrostPhase,
+    ElectricHeaterStage,
+    get_defrost_phase,
+    get_electric_heater_stage,
+    get_status_dtc_ids,
+)
 from .subfeatures.ventilation_bypass_operation_level import (
     VentilationBypassOperationLevel,
     get_ventilation_bypass_operation_level,
@@ -340,6 +354,31 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         translation_key="error_dtc_list",
         data_retriever=lambda data: ", ".join(
             {e["Error"]["Text"] for e in json_loads(data).get("ListEntries", [])}) or "-"
+    ),
+    # DID 257/263/259: active status, warning and info message lists
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.StatusDtcList],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:message-text",
+        key="status_dtc_list",
+        translation_key="status_dtc_list",
+        data_retriever=lambda data: get_dtc_list_state(data, "State")
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.WarningDtcList],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:alert",
+        key="warning_dtc_list",
+        translation_key="warning_dtc_list",
+        data_retriever=lambda data: get_dtc_list_state(data, "Warning")
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.InfoDtcList],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:information",
+        key="info_dtc_list",
+        translation_key="info_dtc_list",
+        data_retriever=lambda data: get_dtc_list_state(data, "Info")
     ),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Misc.BackendConnectionStatus],
@@ -1929,6 +1968,28 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_device=Open3eDevices.Vitocal
     ),
 
+    # DID 257: StatusDtcList, defrost phase and electric heater stage from the active status messages
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.StatusDtcList],
+        device_class=SensorDeviceClass.ENUM,
+        icon="mdi:snowflake-melt",
+        key="defrost_phase",
+        translation_key="defrost_phase",
+        data_retriever=get_defrost_phase,
+        options=[phase for phase in DefrostPhase],
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.StatusDtcList],
+        device_class=SensorDeviceClass.ENUM,
+        icon="mdi:heating-coil",
+        key="electric_heater_stage",
+        translation_key="electric_heater_stage",
+        data_retriever=get_electric_heater_stage,
+        options=[stage for stage in ElectricHeaterStage],
+        required_device=Open3eDevices.Vitocal
+    ),
+
     # DID 2855/2856: MixerOne/TwoCircuitFrostProtectionConfiguration
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Misc.MixerOneCircuitFrostProtectionConfiguration],
@@ -2763,6 +2824,23 @@ DERIVED_SENSORS: tuple[Open3eDerivedSensorEntityDescription, ...] = (
             thermals=(heating_t, cooling_t, dhw_t),
             electrics=(heating_e, cooling_e, dhw_e)
         ),
+        required_device=Open3eDevices.Vitocal
+    ),
+    # DID 2806 + 2735 + 2352 + 257: one activity state for timelines (heating, hot water, defrost, ...)
+    Open3eDerivedSensorEntityDescription(
+        poll_data_features=[
+            Features.State.RefrigerationCircuitOperationMode,
+            Features.Position.FourThreeWayValve,
+            Features.State.AdditionalHeater,
+            Features.Misc.StatusDtcList
+        ],
+        device_class=SensorDeviceClass.ENUM,
+        key="heat_pump_activity",
+        translation_key="heat_pump_activity",
+        icon="mdi:heat-pump-outline",
+        options=[activity for activity in HeatPumpActivity],
+        data_retrievers=[get_refrigeration_circuit_mode, get_enum_id, is_power_state_on, get_status_dtc_ids],
+        compute_value=compute_heat_pump_activity,
         required_device=Open3eDevices.Vitocal
     )
 )

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Callable, Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription, BinarySensorDeviceClass
+from homeassistant.const import EntityCategory
 from homeassistant.util.json import json_loads
 
 from .devices import Open3eDevices
@@ -9,6 +10,8 @@ from .entity_description import Open3eEntityDescription
 from .features import Features
 from .subfeatures.domestic_hot_water_operation_state import is_domestic_hot_water_operation_state_active
 from .subfeatures.info_dtc_list import InfoDtc, is_info_dtc_active
+from .subfeatures.refrigeration_circuit_mode import RefrigerationCircuitOperationMode, get_refrigeration_circuit_mode
+from .subfeatures.status_dtc_list import is_frost_protection_active, is_utility_lock_active
 from ..capability.capability import Capability
 
 
@@ -277,6 +280,51 @@ BINARY_SENSORS: tuple[Open3eBinarySensorEntityDescription, ...] = (
         icon="mdi:water-percent",
         data_transform=lambda data: is_info_dtc_active(data, InfoDtc.MIXER_TWO_CIRCUIT_HUMIDITY_PROTECTION_ACTIVATED),
         required_capabilities=[Capability.Circuit2],
+        required_device=Open3eDevices.Vitocal
+    ),
+
+    # DID 2806: RefrigerationCircuitOperationMode, De-icing
+    Open3eBinarySensorEntityDescription(
+        device_class=BinarySensorDeviceClass.RUNNING,
+        poll_data_features=[Features.State.RefrigerationCircuitOperationMode],
+        key="defrost_active",
+        translation_key="defrost_active",
+        icon="mdi:snowflake-melt",
+        data_transform=lambda data: (
+            None if (mode := get_refrigeration_circuit_mode(data)) is None
+            else mode == RefrigerationCircuitOperationMode.DEFROST
+        ),
+        required_device=Open3eDevices.Vitocal
+    ),
+
+    # DID 257: StatusDtcList, frost protection (S.181-190, S.393-402) and power supplier lock (S.195/196)
+    Open3eBinarySensorEntityDescription(
+        device_class=BinarySensorDeviceClass.RUNNING,
+        poll_data_features=[Features.Misc.StatusDtcList],
+        key="frost_protection_active",
+        translation_key="frost_protection_active",
+        icon="mdi:snowflake-alert",
+        data_transform=is_frost_protection_active,
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eBinarySensorEntityDescription(
+        poll_data_features=[Features.Misc.StatusDtcList],
+        key="utility_lock",
+        translation_key="utility_lock",
+        icon="mdi:transmission-tower-off",
+        data_transform=is_utility_lock_active,
+        required_device=Open3eDevices.Vitocal
+    ),
+
+    # DID 1774: CompressorCrankCaseHeater (meaning of the value not confirmed yet, disabled by default)
+    Open3eBinarySensorEntityDescription(
+        poll_data_features=[Features.Misc.CompressorCrankCaseHeater],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        key="crankcase_heater",
+        translation_key="crankcase_heater",
+        icon="mdi:heating-coil",
+        entity_registry_enabled_default=False,
+        data_transform=lambda data: int(data) > 0,
         required_device=Open3eDevices.Vitocal
     ),
 

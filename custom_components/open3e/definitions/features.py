@@ -327,6 +327,7 @@ class Features:
         ChimneySweeperTestMode = Feature(id=1537, refresh_interval=30)
         SmartGridReadyConsolidator = Feature(id=543, refresh_interval=30)
         ExternalLockActive = Feature(id=1731, refresh_interval=30)
+        CompressorCrankCaseHeater = Feature(id=1774, refresh_interval=60)
         MixerOneCircuitHumidityProtection = Feature(id=1843, refresh_interval=60)
         MixerTwoCircuitHumidityProtection = Feature(id=1844, refresh_interval=60)
         DomesticHotWaterStatus = Feature(id=2320, refresh_interval=30)
