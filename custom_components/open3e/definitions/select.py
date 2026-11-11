@@ -9,6 +9,8 @@ from .features import Features
 from .open3e_data import Open3eDataDevice
 from .subfeatures.buffer_mode import BufferMode
 from .subfeatures.bypass_operation_state import BypassOperationState, get_bypass_operation_state
+from .subfeatures.heater_power_level import heater_level_from_payload, heater_watts_from_level
+from ..const import VIESSMANN_HEATER_POWER_LEVELS
 from .. import Open3eDataUpdateCoordinator
 
 
@@ -20,6 +22,9 @@ class Open3eSelectEntityDescription(
     domain: str = "select"
     get_option: Callable[[Any], str | None] = None
     set_option: Callable[[str, Open3eDataDevice, Open3eDataUpdateCoordinator], Awaitable[None]] = None
+    # Stay available (state "unknown") when data arrived but maps to no option, so a valid
+    # option can still be chosen to leave that state.
+    available_without_option: bool = False
 
 
 SELECTS: tuple[Open3eSelectEntityDescription, ...] = (
@@ -39,6 +44,21 @@ SELECTS: tuple[Open3eSelectEntityDescription, ...] = (
         ),
         key="buffer_operation_mode",
         translation_key="buffer_operation_mode",
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSelectEntityDescription(
+        poll_data_features=[Features.Power.MaxElectricalHeater],
+        options=list(VIESSMANN_HEATER_POWER_LEVELS.keys()),
+        get_option=lambda data: heater_level_from_payload(data),
+        set_option=lambda option, device, coordinator: coordinator.async_set_max_power_electrical_heater(
+            feature_id=Features.Power.MaxElectricalHeater.id,
+            max_power=heater_watts_from_level(option),
+            device=device
+        ),
+        available_without_option=True,
+        icon="mdi:heating-coil",
+        key="heater_max_power_level",
+        translation_key="heater_max_power_level",
         required_device=Open3eDevices.Vitocal
     ),
 

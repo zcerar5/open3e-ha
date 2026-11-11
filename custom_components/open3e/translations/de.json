@@ -21,6 +21,12 @@
     },
     "unavailable": {
       "message": "Der Open3e Server ist nicht verfügbar."
+    },
+    "heater_power_unsafe": {
+      "message": "Abgelehnt: {watts} W liegt zwischen 0 und {minimum} W. Der Heizstab schaltet nur ganze Stufen (ca. 2,7, 5,3 oder 8 kW), und Grenzen unter der ersten Stufe bringen die Wärmepumpe durcheinander (Verdichter aus, 4/3-Wege-Ventil springt). 0 W oder mindestens {minimum} W verwenden."
+    },
+    "write_not_confirmed": {
+      "message": "Die Wärmepumpe hat den neuen Wert nicht bestätigt: geschrieben {expected}, zurückgelesen {actual}."
     }
   },
   "entity": {
@@ -1178,6 +1184,15 @@
         "state": {
           "heating": "Heizen",
           "cooling": "Kühlen"
+        }
+      },
+      "heater_max_power_level": {
+        "name": "Heizstab max. Stufe",
+        "state": {
+          "off": "Aus (0 kW)",
+          "stage_1": "Stufe 1 (ca. 2,7 kW)",
+          "stage_2": "Stufe 1-2 (ca. 5,3 kW)",
+          "full": "Voll (8 kW)"
         }
       },
       "quick_operation_mode": {

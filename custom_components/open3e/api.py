@@ -298,22 +298,64 @@ class Open3eMqttClient:
             self,
             hass: HomeAssistant,
             feature_id: int,
-            max_power: float,
+            max_power: int,
             device_id: int
     ):
+        # The HPMU ignores the codec "write" for DID 2626 (payload "8000.0"), but accepts a
+        # raw write of the Int32 little-endian watts (verified on a Vitocal 222-S, software
+        # 2532, and in open3e discussion #205).
+        raw = int(max_power).to_bytes(4, "little", signed=True).hex()
         try:
-            _LOGGER.debug(f"Setting max power of electrical heater of feature ID {feature_id}")
+            _LOGGER.debug(f"Setting max power of electrical heater of feature ID {feature_id} to {max_power} W ({raw})")
             await mqtt.async_publish(
                 hass=hass,
                 topic=self.__mqtt_cmd,
-                payload=self.__write_json_payload(
+                payload=self.__write_raw_payload(
                     feature_id=feature_id,
-                    data=max_power,
+                    data=raw,
                     device_id=device_id
                 )
             )
         except Exception as exception:
             raise Open3eError(exception)
+
+    async def async_wait_for_feature_value(
+            self,
+            hass: HomeAssistant,
+            topic: str,
+            feature_id: int,
+            device_id: int,
+            is_expected: Callable[[Any], bool],
+            timeout: float,
+    ) -> Any:
+        """
+        Request a feature until its published payload satisfies is_expected or the timeout ends.
+        Returns the last payload seen (None if nothing arrived).
+        """
+        last_payload: Any = None
+        confirmed = asyncio.Event()
+
+        def on_message(msg: ReceiveMessage):
+            nonlocal last_payload
+            last_payload = msg.payload
+            if is_expected(msg.payload):
+                hass.loop.call_soon_threadsafe(confirmed.set)
+
+        unsubscribe = await mqtt.async_subscribe(hass=hass, topic=topic, msg_callback=on_message)
+        try:
+            async with async_timeout.timeout(timeout):
+                while not confirmed.is_set():
+                    await self.async_request_data(hass, {device_id: [feature_id]})
+                    try:
+                        await asyncio.wait_for(confirmed.wait(), 3)
+                    except asyncio.TimeoutError:
+                        continue
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            unsubscribe()
+
+        return last_payload
 
     async def async_set_smart_grid_temperature_offset(
             self,

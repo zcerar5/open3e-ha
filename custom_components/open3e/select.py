@@ -48,10 +48,13 @@ class Open3eSelect(Open3eEntity, SelectEntity):
     ):
         super().__init__(coordinator, description, device)
         self._attr_current_option = None
+        self._has_data = False
 
     @property
     def available(self):
         """Return True if entity is available."""
+        if self.entity_description.available_without_option:
+            return self._has_data
         return self._attr_current_option is not None
 
     async def async_select_option(self, option: str) -> None:
@@ -67,4 +70,5 @@ class Open3eSelect(Open3eEntity, SelectEntity):
             return
 
         self._attr_current_option = self.entity_description.get_option(self.data[feature_id])
+        self._has_data = True
         self.async_write_ha_state()

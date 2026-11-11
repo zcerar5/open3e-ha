@@ -21,6 +21,12 @@
     },
     "unavailable": {
       "message": "The Open3e server is unavailable."
+    },
+    "heater_power_unsafe": {
+      "message": "Refused: {watts} W is between 0 and {minimum} W. The heater only switches whole stages (about 2.7, 5.3 or 8 kW), and limits below the first stage make the heat pump malfunction (compressor off, 4/3-way valve flapping). Use 0 W or at least {minimum} W."
+    },
+    "write_not_confirmed": {
+      "message": "The heat pump did not confirm the new value: wrote {expected}, read back {actual}."
     }
   },
   "entity": {
@@ -1178,6 +1184,15 @@
         "state": {
           "heating": "Heating",
           "cooling": "Cooling"
+        }
+      },
+      "heater_max_power_level": {
+        "name": "Electrical heater maximum stage",
+        "state": {
+          "off": "Off (0 kW)",
+          "stage_1": "Stage 1 (about 2.7 kW)",
+          "stage_2": "Stages 1-2 (about 5.3 kW)",
+          "full": "Full (8 kW)"
         }
       },
       "quick_operation_mode": {

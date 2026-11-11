@@ -18,7 +18,7 @@ from custom_components.open3e.definitions.subfeatures.hysteresis import Hysteres
 from custom_components.open3e.definitions.subfeatures.program import Program
 from custom_components.open3e.definitions.subfeatures.smart_grid_temperature_offsets import SmartGridTemperatureOffsets
 from .api import Open3eMqttClient
-from .const import DOMAIN
+from .const import DOMAIN, VIESSMANN_HEATER_POWER_UNSAFE_BELOW_WATT, WRITE_CONFIRM_TIMEOUT
 from .definitions.open3e_data import Open3eDataSystemInformation, Open3eDataDevice
 from .definitions.subfeatures.buffer_mode import BufferMode
 from .definitions.subfeatures.dhw_hysteresis import DhwHysteresis
@@ -26,7 +26,8 @@ from .definitions.subfeatures.heating_curve import HeatingCurve
 from .definitions.subfeatures.hvac_mode import HvacMode
 from .definitions.subfeatures.ventilation_mode import VentilationMode
 from .definitions.subfeatures.vitoair_quick_mode import VitoairQuickMode
-from .errors import Open3eCoordinatorUpdateFailed
+from .definitions.subfeatures.heater_power_level import heater_power_watts
+from .errors import Open3eCoordinatorUpdateFailed, Open3eHeaterPowerRefusedError, Open3eWriteNotConfirmedError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -282,14 +283,37 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
             max_power: float,
             device: Open3eDataDevice
     ):
+        watts = int(round(max_power))
+        if 0 < watts < VIESSMANN_HEATER_POWER_UNSAFE_BELOW_WATT:
+            raise Open3eHeaterPowerRefusedError(watts, VIESSMANN_HEATER_POWER_UNSAFE_BELOW_WATT)
+
         await self.__client.async_set_max_power_electrical_heater(
             hass=self.hass,
             feature_id=feature_id,
-            max_power=max_power,
+            max_power=watts,
             device_id=device.id
         )
 
-        self.async_refresh_feature(device, [feature_id])
+        topic = next((feature.topic for feature in device.features if feature.id == feature_id), None)
+        if topic is None:
+            self.async_refresh_feature(device, [feature_id])
+            return
+
+        # Read the value back; the entities subscribed to the same topic update from it.
+        await asyncio.sleep(1)
+        payload = await self.__client.async_wait_for_feature_value(
+            hass=self.hass,
+            topic=topic,
+            feature_id=feature_id,
+            device_id=device.id,
+            is_expected=lambda p: heater_power_watts(p) == watts,
+            timeout=WRITE_CONFIRM_TIMEOUT,
+        )
+        if heater_power_watts(payload) != watts:
+            _LOGGER.warning(
+                "Heat pump did not confirm electrical heater max power %s W (read back %s)", watts, payload
+            )
+            raise Open3eWriteNotConfirmedError(f"{watts} W", f"{payload} W")
 
     async def async_set_smart_grid_temperature_offset(
             self,
