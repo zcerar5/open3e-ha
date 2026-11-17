@@ -415,6 +415,9 @@
       "cop_heating_current_year": {
         "name": "COP heating year"
       },
+      "cop_cooling_current_year": {
+        "name": "COP cooling year"
+      },
       "cop_dhw_current_year": {
         "name": "COP warm water year"
       },
@@ -457,6 +460,9 @@
           "noise_reduced": "Noise reduced",
           "dynamic": "Dynamic"
         }
+      },
+      "ventilation_bypass_dynamic_level": {
+        "name": "Dynamic bypass ventilation level"
       },
       "ventilation_bypass_position": {
         "name": "Bypass position"
@@ -611,6 +617,19 @@
       "gateway_remote_signal_strength": {
         "name": "WiFi signal strength"
       },
+      "gateway_ethernet_mac": {
+        "name": "LAN MAC address"
+      },
+      "gateway_ethernet_network_status": {
+        "name": "LAN status",
+        "state": {
+          "connected": "Connected",
+          "not_connected": "Not connected"
+        }
+      },
+      "gateway_ethernet_ip": {
+        "name": "LAN IP address"
+      },
       "central_heating_one_circuit_name": {
         "name": "Name circuit 1"
       },
@@ -674,6 +693,12 @@
       "circuit2_pump_status": {
         "name": "Heating circuit 2 pump status"
       },
+      "circuit3_pump_status": {
+        "name": "Heating circuit 3 pump status"
+      },
+      "circuit4_pump_status": {
+        "name": "Heating circuit 4 pump status"
+      },
       "compressor_max_speed_heating": {
         "name": "Compressor maximum speed heating"
       },
@@ -693,6 +718,41 @@
           "active": "Active",
           "postrun": "Postrun"
         }
+      },
+      "dhw_tank_anode_current": {
+        "name": "Hot water tank anode"
+      },
+      "dhw_tank_anode_current_average": {
+        "name": "Hot water tank anode average"
+      },
+      "dhw_tank_anode_current_minimum": {
+        "name": "Hot water tank anode minimum"
+      },
+      "dhw_tank_anode_current_maximum": {
+        "name": "Hot water tank anode maximum"
+      },
+      "dhw_tank_anode_sensor_status": {
+        "name": "Hot water tank anode sensor status",
+        "state": {
+          "no_error": "No error",
+          "interruption": "Interruption",
+          "short_circuit": "Short circuit",
+          "electrical_fault": "Electrical fault",
+          "not_available": "Not available",
+          "invalidates": "Invalid"
+        }
+      },
+      "water_pressure_default": {
+        "name": "Water pressure default"
+      },
+      "water_pressure_normal_delta": {
+        "name": "Water pressure normal delta"
+      },
+      "water_pressure_maximum": {
+        "name": "Water pressure maximum"
+      },
+      "water_pressure_error_threshold": {
+        "name": "Water pressure error threshold"
       },
       "flow_temperature_circuit1_maximum": {
         "name": "Circuit 1 flow temperature maximum"
@@ -714,6 +774,15 @@
       },
       "mixer_one_circuit_current_temperature_setpoint": {
         "name": "Circuit 1 current temperature setpoint"
+      },
+      "mixer_one_circuit_pump_minimum_speed": {
+        "name": "Circuit 1 pump minimum speed"
+      },
+      "mixer_one_circuit_pump_maximum_speed": {
+        "name": "Circuit 1 pump maximum speed"
+      },
+      "mixer_one_circuit_summer_saving_temperature": {
+        "name": "Circuit 1 summer saving temperature threshold"
       },
       "mixer_two_circuit_current_temperature_setpoint": {
         "name": "Circuit 2 current temperature setpoint"
@@ -822,6 +891,36 @@
       },
       "energy_own_consumption_past_year": {
         "name": "Own energy consumption past year"
+      },
+      "energy_recovered_today": {
+        "name": "Recovered energy today"
+      },
+      "energy_recovered_current_month": {
+        "name": "Recovered energy current month"
+      },
+      "energy_recovered_current_year": {
+        "name": "Recovered energy current year"
+      },
+      "energy_recovered_past_year": {
+        "name": "Recovered energy past year"
+      },
+      "minimum_supply_air_temperature_dynamic": {
+        "name": "Minimum supply air temperature (dynamic)"
+      },
+      "minimum_supply_air_temperature_noise_reduced": {
+        "name": "Minimum supply air temperature (noise reduced)"
+      },
+      "filter_runtime": {
+        "name": "Filter runtime"
+      },
+      "filter_runtime_remaining": {
+        "name": "Filter runtime remaining"
+      },
+      "filter_condition": {
+        "name": "Filter condition"
+      },
+      "current_ventilation_heat_recovery": {
+        "name": "Heat recovery"
       }
     },
     "binary_sensor": {
@@ -841,7 +940,7 @@
         "name": "Heating circuit 4 circulation pump"
       },
       "hot_water_circulation_pump_hygiene": {
-        "name": "Hot water legionella protection"
+        "name": "Circulation pump during hygiene function"
       },
       "additional_heater_active": {
         "name": "Additional heater"
@@ -865,13 +964,16 @@
         "name": "Hot water operation status"
       },
       "legionella_protection_activation": {
-        "name": "Hot water legionella protection"
+        "name": "Legionella protection"
       },
       "malfunction_heating_unit_blocked": {
         "name": "Heating malfunction"
       },
       "mixer_one_circuit_operation_state": {
         "name": "Pump circuit 1"
+      },
+      "mixer_one_circuit_summer_saving": {
+        "name": "Circuit 1 summer saving"
       },
       "mixer_two_circuit_operation_state": {
         "name": "Pump circuit 2"
@@ -1000,6 +1102,9 @@
       }
     },
     "number": {
+      "quick_mode_duration": {
+        "name": "Quick mode duration"
+      },
       "circuit_1_comfort_temperature": {
         "name": "Climate circuit 1 heating comfort"
       },
@@ -1135,6 +1240,15 @@
       "frost_protection_temperature": {
         "name": "Frost protection temperature heating circuit"
       },
+      "mixer_one_circuit_room_temperature_reduced": {
+        "name": "Circuit 1 room temperature reduced"
+      },
+      "mixer_one_circuit_room_temperature_standard": {
+        "name": "Circuit 1 room temperature standard"
+      },
+      "mixer_one_circuit_room_temperature_comfort": {
+        "name": "Circuit 1 room temperature comfort"
+      },
       "circuit_1_heating_curve_slope": {
         "name": "Heating curve 1 slope"
       },
@@ -1153,6 +1267,9 @@
       "circuit_2_heating_curve_level": {
         "name": "Heating curve 2 level"
       },
+      "circuit_2_flow_temperature_offset": {
+        "name": "Heating circuit 2 buffer setpoint offset"
+      },
       "circuit_3_heating_curve_level": {
         "name": "Heating curve 3 level"
       },
@@ -1164,6 +1281,12 @@
       },
       "dhw_hysteresis_off": {
         "name": "Warm water hysteresis off"
+      },
+      "buffer_hysteresis_on": {
+        "name": "Buffer tank hysteresis on"
+      },
+      "buffer_hysteresis_off": {
+        "name": "Buffer tank hysteresis off"
       },
       "circuit_1_pump_speed": {
         "name": "Heating circuit 1 circulation pump speed"
@@ -1201,7 +1324,7 @@
           "none": "-",
           "intensive": "Intensive ventilation",
           "reduced_noise": "Reduced noise",
-          "off": "Off"
+          "off": "Temporary system shutdown"
         }
       },
       "ventilation_bypass_operation_state": {

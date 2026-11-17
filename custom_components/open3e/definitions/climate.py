@@ -18,6 +18,7 @@ class Open3eClimateEntityDescription(
     flow_temperature_feature: Feature | None = None
     room_temperature_feature: Feature | None = None
     programs_temperature_feature: Feature | None = None
+    cooling_programs_temperature_feature: Feature | None = None
     compressor_state_feature: Feature | None = None
     circuit_pump_feature: Feature | None = None
     domestic_hot_water_status_feature: Feature | None = None
@@ -30,6 +31,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
             Features.Temperature.Room1,
             Features.State.HvacCircuit1,
             Features.Temperature.ProgramsCircuit1,
+            Features.Temperature.CoolingProgramsCircuit1,
             Features.State.HeatPumpCompressor,
             Features.State.Circuit1Pump,
             Features.Misc.DomesticHotWaterStatus
@@ -38,6 +40,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
         flow_temperature_feature=Features.Temperature.FlowCircuit1,
         room_temperature_feature=Features.Temperature.Room1,
         programs_temperature_feature=Features.Temperature.ProgramsCircuit1,
+        cooling_programs_temperature_feature=Features.Temperature.CoolingProgramsCircuit1,
         compressor_state_feature=Features.State.HeatPumpCompressor,
         circuit_pump_feature=Features.State.Circuit1Pump,
         domestic_hot_water_status_feature=Features.Misc.DomesticHotWaterStatus,
@@ -52,6 +55,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
             Features.Temperature.Room2,
             Features.State.HvacCircuit2,
             Features.Temperature.ProgramsCircuit2,
+            Features.Temperature.CoolingProgramsCircuit2,
             Features.State.HeatPumpCompressor,
             Features.State.Circuit2Pump,
             Features.Misc.DomesticHotWaterStatus
@@ -60,6 +64,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
         flow_temperature_feature=Features.Temperature.FlowCircuit2,
         room_temperature_feature=Features.Temperature.Room2,
         programs_temperature_feature=Features.Temperature.ProgramsCircuit2,
+        cooling_programs_temperature_feature=Features.Temperature.CoolingProgramsCircuit2,
         compressor_state_feature=Features.State.HeatPumpCompressor,
         circuit_pump_feature=Features.State.Circuit2Pump,
         domestic_hot_water_status_feature=Features.Misc.DomesticHotWaterStatus,
@@ -75,6 +80,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
             Features.Temperature.Room3,
             Features.State.HvacCircuit3,
             Features.Temperature.ProgramsCircuit3,
+            Features.Temperature.CoolingProgramsCircuit3,
             Features.State.HeatPumpCompressor,
             Features.State.Circuit3Pump,
             Features.Misc.DomesticHotWaterStatus
@@ -83,6 +89,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
         flow_temperature_feature=Features.Temperature.FlowCircuit3,
         room_temperature_feature=Features.Temperature.Room3,
         programs_temperature_feature=Features.Temperature.ProgramsCircuit3,
+        cooling_programs_temperature_feature=Features.Temperature.CoolingProgramsCircuit3,
         compressor_state_feature=Features.State.HeatPumpCompressor,
         circuit_pump_feature=Features.State.Circuit3Pump,
         domestic_hot_water_status_feature=Features.Misc.DomesticHotWaterStatus,
@@ -98,6 +105,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
             Features.Temperature.Room4,
             Features.State.HvacCircuit4,
             Features.Temperature.ProgramsCircuit4,
+            Features.Temperature.CoolingProgramsCircuit4,
             Features.State.HeatPumpCompressor,
             Features.State.Circuit4Pump,
             Features.Misc.DomesticHotWaterStatus
@@ -106,6 +114,7 @@ CLIMATE: tuple[Open3eClimateEntityDescription, ...] = (
         flow_temperature_feature=Features.Temperature.FlowCircuit4,
         room_temperature_feature=Features.Temperature.Room4,
         programs_temperature_feature=Features.Temperature.ProgramsCircuit4,
+        cooling_programs_temperature_feature=Features.Temperature.CoolingProgramsCircuit4,
         compressor_state_feature=Features.State.HeatPumpCompressor,
         circuit_pump_feature=Features.State.Circuit4Pump,
         domestic_hot_water_status_feature=Features.Misc.DomesticHotWaterStatus,

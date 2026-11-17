@@ -84,6 +84,7 @@ class Features:
         SupplyAir = Feature(id=328, refresh_interval=5)
         ExtractAir = Feature(id=329, refresh_interval=5)
         ExhaustAir = Feature(id=330, refresh_interval=5)
+        MinimumVentilationSupplyAir = Feature(id=2355, refresh_interval=300)
         InverterAmbient = Feature(id=1684, refresh_interval=30)
         Battery = Feature(id=2240, refresh_interval=30)
         HeatingBuffer = Feature(id=3016, refresh_interval=30)
@@ -93,6 +94,7 @@ class Features:
         DhwBufferMid = Feature(id=3233, refresh_interval=30)
         DhwBufferTop = Feature(id=3234, refresh_interval=30)
         DomesticHotWaterHysteresis = Feature(id=1085, refresh_interval=30)
+        BufferHysteresis = Feature(id=1593, refresh_interval=300)
 
         # Vitodens
         FlowTemperatureSensor = Feature(id=268, refresh_interval=30)
@@ -124,6 +126,7 @@ class Features:
         MixerTwoCircuitFlowTemperatureMinimumMaximumLimit = Feature(id=1193, refresh_interval=300)
         MixerOneCircuitCurrentTemperatureSetpoint = Feature(id=1643, refresh_interval=30)
         MixerTwoCircuitCurrentTemperatureSetpoint = Feature(id=1644, refresh_interval=30)
+        MixerOneCircuitSummerSavingTemperatureThreshold = Feature(id=1395, refresh_interval=300)
 
     class Humidity:
         Outdoor = Feature(id=419, refresh_interval=5)
@@ -135,6 +138,7 @@ class Features:
         Water = Feature(id=318, refresh_interval=15)
         CompressorInlet = Feature(id=322, refresh_interval=15)
         CompressorOutlet = Feature(id=325, refresh_interval=15)
+        WaterConfiguration = Feature(id=1721, refresh_interval=3600)
 
         # Vitodens
         WaterPressureSensor = Feature(id=318, refresh_interval=10)
@@ -154,8 +158,10 @@ class Features:
         DesiredThermalEnergyDefrost = Feature(id=2256, refresh_interval=30)
         Cop = Feature(id=2625, refresh_interval=300)
         CopHeating = Feature(id=2622, refresh_interval=300)
+        CopCooling = Feature(id=2623, refresh_interval=300)
         CopDhw = Feature(id=2624, refresh_interval=300)
         EnergyOwnConsumption = Feature(id=2760, refresh_interval=300)
+        EnergyRecoveredCrossHeatExchanger = Feature(id=2759, refresh_interval=300)
 
         # Vitodens
         EnergyConsumptionCentralHeating = Feature(id=548, refresh_interval=60)
@@ -214,6 +220,7 @@ class Features:
         EnergyManagement = Feature(id=2350, refresh_interval=30)
         FlowCircuit1HeatingCurve = Feature(id=880, refresh_interval=30)
         FlowCircuit2HeatingCurve = Feature(id=881, refresh_interval=30)
+        MixerTwoCircuitProperty = Feature(id=934, refresh_interval=300)
         FlowCircuit3HeatingCurve = Feature(id=882, refresh_interval=30)
         FlowCircuit4HeatingCurve = Feature(id=883, refresh_interval=30)
         VentilationMode = Feature(id=2371, refresh_interval=30)
@@ -223,14 +230,18 @@ class Features:
         OutsideAirBypass = Feature(id=1088, refresh_interval=30)
         InsideAirBypass = Feature(id=1089, refresh_interval=30)
         BypassOperationLevel = Feature(id=2403, refresh_interval=30)
-        # ToDo: Not yet in Open3e server (still raw hex)
-        # VentilationBypassPosition = Feature(id=2493, refresh_interval=30)
+        VentilationBypassPosition = Feature(id=2493, refresh_interval=30)
         VentilationBypassFlapAvailableCount = Feature(id=2797, refresh_interval=30)
+        CurrentVentilationHeatRecovery = Feature(id=2248, refresh_interval=30)
+        FilterPercentageBlocked = Feature(id=3206, refresh_interval=300)
+        VentilationBypassDynamicVentilationLevel = Feature(id=2846, refresh_interval=60)
 
         # Pump-Status und Kältekreis
         CentralHeatingPumpStatus = Feature(id=2791, refresh_interval=10)
         MixerOneCircuitPumpStatus = Feature(id=2792, refresh_interval=10)
         MixerTwoCircuitPumpStatus = Feature(id=2793, refresh_interval=10)
+        MixerThreeCircuitPumpStatus = Feature(id=2794, refresh_interval=10)
+        MixerFourCircuitPumpStatus = Feature(id=2795, refresh_interval=10)
         RefrigerationCircuitOperationMode = Feature(id=2806, refresh_interval=10)
 
         # Vitodens
@@ -262,13 +273,15 @@ class Features:
         SupplyAirFan = Feature(id=1040, refresh_interval=10)
         ExhaustAirFan = Feature(id=1041, refresh_interval=10)
         Circuit1Pump = Feature(id=1102, refresh_interval=10)
+
+        # Vitodens
+        MixerOneCircuitPumpMinimumMaximumLimit = Feature(id=1102, refresh_interval=300)
         Circuit2Pump = Feature(id=1103, refresh_interval=10)
         Circuit3Pump = Feature(id=1104, refresh_interval=10)
         Circuit4Pump = Feature(id=1105, refresh_interval=10)
 
         # Pumpgeschwindigkeit WW
-        DomesticHotWaterPumpMinimumLimit = Feature(id=1100, refresh_interval=300)
-        DomesticHotWaterPumpMaximumLimit = Feature(id=1101, refresh_interval=300)
+        DomesticHotWaterPumpMinimumMaximumLimit = Feature(id=1101, refresh_interval=300)
 
     class Position:
         ExpansionValve1 = Feature(id=389, refresh_interval=30)
@@ -291,6 +304,7 @@ class Features:
         LegionellaProtectionLastSuccessfulStartTime = Feature(id=877, refresh_interval=60)
         LegionellaProtectionLastSuccessfulWeekday = Feature(id=878, refresh_interval=60)
         HeatEngineStatistical = Feature(id=1346, refresh_interval=60)
+        FilterRuntime = Feature(id=2247, refresh_interval=300)
 
     class Misc:
         CompressorStatistics = Feature(id=2369, refresh_interval=120)
@@ -299,6 +313,7 @@ class Features:
         MalfunctionIdentification = Feature(id=902, refresh_interval=30)
         ErrorDtcList = Feature(id=265, refresh_interval=30)
         BackendConnectionStatus = Feature(id=1165, refresh_interval=30)
+        DomesticHotWaterTankAnode = Feature(id=3170, refresh_interval=300)
 
         # Vitodens
         StatusDtcList = Feature(id=257, refresh_interval=60)
@@ -314,6 +329,10 @@ class Features:
         GatewayMac = Feature(id=593, refresh_interval=2592000)
         GatewayRemoteLocalNetworkStatus = Feature(id=602, refresh_interval=60)
         GatewayRemoteIp = Feature(id=607, refresh_interval=60)
+        MacAddressLan = Feature(id=592, refresh_interval=2592000)
+        GatewayEthernetEnable = Feature(id=1694, refresh_interval=None)
+        GatewayEthernetIp = Feature(id=1696, refresh_interval=60)
+        GatewayEthernetNetworkStatus = Feature(id=1697, refresh_interval=60)
         CentralHeatingOneCircuitName = Feature(id=627, refresh_interval=86400)
         CentralHeatingTwoCircuitName = Feature(id=628, refresh_interval=86400)
         CentralHeatingThreeCircuitName = Feature(id=629, refresh_interval=86400)

@@ -8,6 +8,8 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceRegistry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -18,11 +20,17 @@ from custom_components.open3e.definitions.subfeatures.hysteresis import Hysteres
 from custom_components.open3e.definitions.subfeatures.program import Program
 from custom_components.open3e.definitions.subfeatures.smart_grid_temperature_offsets import SmartGridTemperatureOffsets
 from .api import Open3eMqttClient
-from .const import DOMAIN, VIESSMANN_HEATER_POWER_UNSAFE_BELOW_WATT, WRITE_CONFIRM_TIMEOUT
+from .const import (
+    DOMAIN,
+    VIESSMANN_HEATER_POWER_UNSAFE_BELOW_WATT,
+    VITOAIR_QUICK_MODE_RUNTIME_DEFAULT,
+    WRITE_CONFIRM_TIMEOUT,
+)
 from .definitions.open3e_data import Open3eDataSystemInformation, Open3eDataDevice
 from .definitions.subfeatures.buffer_mode import BufferMode
 from .definitions.subfeatures.dhw_hysteresis import DhwHysteresis
 from .definitions.subfeatures.heating_curve import HeatingCurve
+from .definitions.subfeatures.mixer_circuit_property import MixerCircuitProperty
 from .definitions.subfeatures.hvac_mode import HvacMode
 from .definitions.subfeatures.ventilation_mode import VentilationMode
 from .definitions.subfeatures.vitoair_quick_mode import VitoairQuickMode
@@ -78,23 +86,25 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
 
     system_information: Open3eDataSystemInformation
     __device_registry: DeviceRegistry
-    __entry_id: str
+    __shutting_down: bool
 
     __endpoints: dict[tuple[int, int], CoordinatorEndpoint]
 
-    def __init__(self, hass, client: Open3eMqttClient, entry_id: str):
+    def __init__(self, hass, client: Open3eMqttClient, config_entry: ConfigEntry):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="Open3eDataUpdateCoordinator",
             update_interval=timedelta(seconds=5),
             always_update=True
         )
         self.__client = client
         self.__device_registry = device_registry.async_get(hass)
-        self.__entry_id = entry_id
         self.__endpoints = {}
         self.__server_available = None
+        self.__shutting_down = False
+        self.__vitoair_quick_mode_runtimes: dict[int, int] = {}
 
     async def _async_setup(self):
         """Set up the coordinator
@@ -137,7 +147,7 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
                 name_suffix = f" ({device.serial_number[-4:]})"
 
             self.__device_registry.async_get_or_create(
-                config_entry_id=self.__entry_id,
+                config_entry_id=self.config_entry.entry_id,
                 identifiers={(DOMAIN, device.serial_number)},
                 manufacturer=device.manufacturer,
                 serial_number=device.serial_number,
@@ -152,6 +162,9 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> bool:
         """Update data."""
+        if self.__shutting_down:
+            return True
+
         if self.__server_available is None:
             return True
 
@@ -287,12 +300,16 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
         if 0 < watts < VIESSMANN_HEATER_POWER_UNSAFE_BELOW_WATT:
             raise Open3eHeaterPowerRefusedError(watts, VIESSMANN_HEATER_POWER_UNSAFE_BELOW_WATT)
 
-        await self.__client.async_set_max_power_electrical_heater(
+        sent = await self.__client.async_set_max_power_electrical_heater(
             hass=self.hass,
             feature_id=feature_id,
             max_power=watts,
             device_id=device.id
         )
+        if not sent:
+            # Command gate paused (entry unloading / HA shutting down): nothing was written,
+            # so do not start the read-back loop.
+            return
 
         topic = next((feature.topic for feature in device.features if feature.id == feature_id), None)
         if topic is None:
@@ -413,6 +430,21 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
 
         self.async_refresh_feature(device, [feature_id])
 
+    async def async_set_flow_temperature_offset(
+            self,
+            feature_id: int,
+            value: float,
+            device: Open3eDataDevice
+    ):
+        await self.__client.async_set_flow_temperature_offset(
+            hass=self.hass,
+            feature_id=feature_id,
+            value=value,
+            device_id=device.id
+        )
+
+        self.async_refresh_feature(device, [feature_id])
+
     async def async_set_dhw_hysteresis(
             self,
             feature_id: int,
@@ -471,10 +503,35 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
             hass=self.hass,
             feature_id=set_feature_id,
             mode=mode,
+            runtime=self.__vitoair_quick_mode_runtimes.get(device.id, VITOAIR_QUICK_MODE_RUNTIME_DEFAULT),
             device_id=device.id
         )
 
         self.async_refresh_feature(device, [refresh_feature_id])
+
+    async def async_set_vitoair_quick_mode_runtime(
+            self,
+            refresh_feature_id: int,
+            set_feature_id: int,
+            runtime: float,
+            active_mode: VitoairQuickMode | None,
+            device: Open3eDataDevice
+    ):
+        """Store the runtime sent with the next quick mode write.
+
+        A running quick mode is written again so it restarts with the new runtime, like in the ViCare app.
+        """
+        self.__vitoair_quick_mode_runtimes[device.id] = int(runtime)
+
+        if active_mode is None or active_mode == VitoairQuickMode.Nothing:
+            return
+
+        await self.async_set_vitoair_quick_mode(
+            refresh_feature_id=refresh_feature_id,
+            set_feature_id=set_feature_id,
+            mode=active_mode,
+            device=device
+        )
 
     async def async_set_hot_water_circulation_pump(
             self,
@@ -582,9 +639,34 @@ class Open3eDataUpdateCoordinator(DataUpdateCoordinator):
         self.async_refresh_feature(device, [feature_id])
     
     def async_refresh_feature(self, device: Open3eDataDevice, feature_ids: list[int]):
+        if self.__shutting_down:
+            return
+
         async def delayed_refresh():
             # Wait for 2 seconds to request new states
             await asyncio.sleep(2)
+            if self.__shutting_down:
+                return
             await self.__client.async_request_data(self.hass, {device.id: feature_ids})
 
-        asyncio.create_task(delayed_refresh())
+        # Tracked by the config entry so it is cancelled on unload instead of
+        # leaking and firing a request into a half-torn-down integration.
+        feature_list = ",".join(str(feature_id) for feature_id in feature_ids)
+        self.config_entry.async_create_background_task(
+            self.hass,
+            delayed_refresh(),
+            name=f"{DOMAIN}_refresh_feature_{device.id}_{feature_list}"
+        )
+
+    @callback
+    def prepare_shutdown(self) -> None:
+        """Stop all outgoing traffic to the Open3e server.
+
+        Invoked when Home Assistant is shutting down or the config entry is
+        unloaded. Further reads and writes are suppressed so a request in flight
+        cannot leave the Open3e server's UDS stack wedged - a state it only
+        recovers from with a manual restart - while Home Assistant or the MQTT
+        link is going away.
+        """
+        self.__shutting_down = True
+        self.__client.pause_commands()

@@ -1,4 +1,4 @@
-"""Sample API Client."""
+"""MQTT client for communicating with the Open3e server."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import asyncio
 import logging
 from typing import Callable, Any
 
-import async_timeout
 from homeassistant.components import mqtt
 from homeassistant.components.mqtt import ReceiveMessage
 from homeassistant.core import HomeAssistant
@@ -21,6 +20,7 @@ from custom_components.open3e.definitions.subfeatures.program import Program
 from custom_components.open3e.definitions.subfeatures.smart_grid_temperature_offsets import SmartGridTemperatureOffsets
 from custom_components.open3e.definitions.subfeatures.temperature_cooling import TemperatureCooling
 from .capability.capability import DEVICE_CAPABILITIES, CapabilityFeature
+from .command_gate import Open3eCommandGate
 from .const import MQTT_SYSTEM_TOPIC, MQTT_SYSTEM_PAYLOAD
 from .definitions.devices import Open3eDevices
 from .definitions.open3e_data import Open3eDataSystemInformation, Open3eDataDeviceFeature, Open3eDataDevice
@@ -28,6 +28,7 @@ from .definitions.subfeatures.buffer_mode import BufferMode
 from .definitions.subfeatures.dhw_hysteresis import DhwHysteresis
 from .definitions.subfeatures.heating_curve import HeatingCurve
 from .definitions.subfeatures.hvac_mode import HvacMode
+from .definitions.subfeatures.mixer_circuit_property import MixerCircuitProperty
 from .definitions.subfeatures.ventilation_mode import VentilationMode
 from .definitions.subfeatures.vitoair_quick_mode import VitoairQuickMode
 from .errors import Open3eServerTimeoutError, Open3eError, Open3eServerUnavailableError
@@ -41,6 +42,7 @@ class Open3eMqttClient:
     __mqtt_cmd: str
     __mqtt_topic: str
     """Only used to return availability"""
+    __command_gate: Open3eCommandGate
 
     def __init__(
             self,
@@ -49,6 +51,25 @@ class Open3eMqttClient:
     ) -> None:
         self.__mqtt_topic = mqtt_topic
         self.__mqtt_cmd = mqtt_cmd
+        self.__command_gate = Open3eCommandGate()
+
+    def pause_commands(self) -> None:
+        """Stop sending any further commands to the Open3e server.
+
+        Used while Home Assistant is shutting down or the config entry is
+        unloaded so an in-flight request cannot wedge the server's UDS stack.
+        """
+        self.__command_gate.pause()
+
+    async def __async_publish_command(self, hass: HomeAssistant, payload: str) -> bool:
+        """Publish a payload to the Open3e command topic through the gate.
+
+        Returns ``True`` if the command was sent, ``False`` if it was dropped
+        because the gate is paused.
+        """
+        return await self.__command_gate.async_send(
+            lambda: mqtt.async_publish(hass=hass, topic=self.__mqtt_cmd, payload=payload)
+        )
 
     async def async_check_availability(self, hass: HomeAssistant) -> bool:
         """
@@ -76,7 +97,7 @@ class Open3eMqttClient:
             # A retained LWT payload of "offline" (or any non-"online" value) must
             # not fail the check immediately — Open3e might still publish "online"
             # within the timeout window (e.g. shortly after (re)connecting).
-            async with async_timeout.timeout(10):
+            async with asyncio.timeout(10):
                 while not available:
                     event.clear()
                     await event.wait()
@@ -132,9 +153,8 @@ class Open3eMqttClient:
             # Ensure subscription is active
             await asyncio.sleep(1)
 
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=MQTT_SYSTEM_PAYLOAD
             )
 
@@ -157,9 +177,13 @@ class Open3eMqttClient:
     async def async_request_data(self, hass: HomeAssistant, device_features: dict[int, list[int]]):
         try:
             for device in device_features.keys():
+                if not device_features[device]:
+                    continue
                 data = ",".join(map(str, device_features[device]))
-                await mqtt.async_publish(hass=hass, topic=self.__mqtt_cmd,
-                                         payload=f'{{"mode": "read-json", "addr": "{device}", "data":[{data}]}}')
+                await self.__async_publish_command(
+                    hass=hass,
+                    payload=f'{{"mode": "read-json", "addr": "{device}", "data":[{data}]}}'
+                )
 
         except Exception as exception:
             raise Open3eError(exception)
@@ -174,9 +198,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting programs of feature ID {set_programs_feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=set_programs_feature_id,
                     sub_feature=program.map_to_api_heating(),
@@ -197,9 +220,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting programs of feature ID {set_programs_feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=set_programs_feature_id,
                     sub_feature=program.map_to_api_cooling(),
@@ -219,9 +241,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting hot water temperature of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=temperature,
@@ -240,9 +261,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting HVAC mode {mode} of feature ID {hvac_mode_feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=hvac_mode_feature_id,
                     data=mode.to_api(),
@@ -257,24 +277,26 @@ class Open3eMqttClient:
         try:
             _LOGGER.debug(f"Setting DMW mode to {mode}")
 
+            # The operation state (Mode + State, one byte each) is written as raw bytes:
+            # since Open3e 0.6.1 "State" is an enum that rejects plain integers, while
+            # older versions only accept integers. Raw bytes work with both.
             state_payload = None
             efficiency_payload = None
 
             match mode:
                 case DmwMode.Eco:
-                    state_payload = {"Mode": 1, "State": 1}
+                    state_payload = "0101"
                     efficiency_payload = 0
                 case DmwMode.Comfort:
-                    state_payload = {"Mode": 1, "State": 1}
+                    state_payload = "0101"
                     efficiency_payload = 2
                 case DmwMode.Off:
-                    state_payload = {"Mode": 0, "State": 0}
+                    state_payload = "0000"
 
             if state_payload is not None:
-                await mqtt.async_publish(
+                await self.__async_publish_command(
                     hass=hass,
-                    topic=self.__mqtt_cmd,
-                    payload=self.__write_json_payload(
+                    payload=self.__write_raw_payload(
                         feature_id=dmw_state_feature_id,
                         data=state_payload,
                         device_id=device_id
@@ -282,9 +304,8 @@ class Open3eMqttClient:
                 )
 
             if efficiency_payload is not None:
-                await mqtt.async_publish(
+                await self.__async_publish_command(
                     hass=hass,
-                    topic=self.__mqtt_cmd,
                     payload=self.__write_json_payload(
                         feature_id=dmw_efficiency_mode_feature_id,
                         data=efficiency_payload,
@@ -307,9 +328,10 @@ class Open3eMqttClient:
         raw = int(max_power).to_bytes(4, "little", signed=True).hex()
         try:
             _LOGGER.debug(f"Setting max power of electrical heater of feature ID {feature_id} to {max_power} W ({raw})")
-            await mqtt.async_publish(
+            # Raw payload, but sent through the command gate like every other command
+            # (serialised, paced, dropped while the gate is paused on unload/shutdown).
+            sent = await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_raw_payload(
                     feature_id=feature_id,
                     data=raw,
@@ -318,6 +340,12 @@ class Open3eMqttClient:
             )
         except Exception as exception:
             raise Open3eError(exception)
+
+        if not sent:
+            _LOGGER.warning(
+                f"Max power of electrical heater (feature ID {feature_id}) not written: command gate is paused"
+            )
+        return sent
 
     async def async_wait_for_feature_value(
             self,
@@ -343,7 +371,7 @@ class Open3eMqttClient:
 
         unsubscribe = await mqtt.async_subscribe(hass=hass, topic=topic, msg_callback=on_message)
         try:
-            async with async_timeout.timeout(timeout):
+            async with asyncio.timeout(timeout):
                 while not confirmed.is_set():
                     await self.async_request_data(hass, {device_id: [feature_id]})
                     try:
@@ -367,9 +395,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting {offset} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=value,
@@ -389,9 +416,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting {TemperatureCooling.EffectiveSetTemperature} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=value,
@@ -412,9 +438,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting {hysteresis} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=value,
@@ -435,9 +460,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting {buffer} temperature of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=value,
@@ -457,9 +481,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting {value} temperature of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=value,
@@ -480,9 +503,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting {heating_curve} temperature of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=value,
@@ -503,13 +525,33 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting {hysteresis} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=value,
                     sub_feature=hysteresis,
+                    device_id=device_id
+                )
+            )
+        except Exception as exception:
+            raise Open3eError(exception)
+
+    async def async_set_flow_temperature_offset(
+            self,
+            hass: HomeAssistant,
+            feature_id: int,
+            value: float,
+            device_id: int
+    ):
+        try:
+            _LOGGER.debug(f"Setting {MixerCircuitProperty.FlowTemperatureOffset} of feature ID {feature_id}")
+            await self.__async_publish_command(
+                hass=hass,
+                payload=self.__write_json_payload(
+                    feature_id=feature_id,
+                    data=value,
+                    sub_feature=MixerCircuitProperty.FlowTemperatureOffset,
                     device_id=device_id
                 )
             )
@@ -525,9 +567,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting buffer mode to {mode} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=mode.map_to_api(),
@@ -546,9 +587,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting hot water quickmode to {is_on} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data={"OpMode": 2, "Required": "on" if is_on else "off", "Unknown": "0000"},
@@ -563,16 +603,22 @@ class Open3eMqttClient:
             hass: HomeAssistant,
             feature_id: int,
             mode: VitoairQuickMode,
+            runtime: int,
             device_id: int
     ):
         try:
-            _LOGGER.debug(f"Setting quickmode to {mode} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            _LOGGER.debug(f"Setting quickmode to {mode} for {runtime} min of feature ID {feature_id}")
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
-                    data={"OpMode": mode.map_to_api(), "Required": "on", "Unknown": "3c00"},  # 3c00 -> 60mins
+                    # 6-byte Vitoair layout of DID 1006, Runtime in minutes
+                    data={
+                        "OpMode": mode.map_to_api(),
+                        "Required": "off" if mode == VitoairQuickMode.Nothing else "on",
+                        "Runtime": 0 if mode == VitoairQuickMode.Nothing else runtime,
+                        "Unknown": "0000"
+                    },
                     device_id=device_id
                 )
             )
@@ -588,9 +634,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting hot water pump to {is_on} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     sub_feature="State",
@@ -610,9 +655,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting level to {level} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=level,
@@ -632,9 +676,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting mode to {mode} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=mode.map_to_api(),
@@ -654,9 +697,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting bypass operation state to {state} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=state.map_to_api(),
@@ -677,9 +719,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting pump speed to {speed} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=speed,
@@ -699,9 +740,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting backup box discharge limit percentage to {backup_box_discharge_limit_percentage} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     sub_feature="DischargeLimit",
@@ -721,9 +761,8 @@ class Open3eMqttClient:
     ):
         try:
             _LOGGER.debug(f"Setting maximum recharge power to {maximum_recharge_power} of feature ID {feature_id}")
-            await mqtt.async_publish(
+            await self.__async_publish_command(
                 hass=hass,
-                topic=self.__mqtt_cmd,
                 payload=self.__write_json_payload(
                     feature_id=feature_id,
                     data=maximum_recharge_power,

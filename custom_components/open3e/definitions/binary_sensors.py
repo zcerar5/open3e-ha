@@ -9,10 +9,23 @@ from .devices import Open3eDevices
 from .entity_description import Open3eEntityDescription
 from .features import Features
 from .subfeatures.domestic_hot_water_operation_state import is_domestic_hot_water_operation_state_active
+from .subfeatures.frost_protection_status import is_frost_protection_active
 from .subfeatures.info_dtc_list import InfoDtc, is_info_dtc_active
 from .subfeatures.refrigeration_circuit_mode import RefrigerationCircuitOperationMode, get_refrigeration_circuit_mode
-from .subfeatures.status_dtc_list import is_frost_protection_active, is_utility_lock_active
+from .subfeatures.status_dtc_list import (
+    is_frost_protection_active as is_status_dtc_frost_protection_active,
+    is_utility_lock_active,
+)
 from ..capability.capability import Capability
+
+
+def _to_int(value: Any) -> int:
+    """Convert a value to int.
+
+    Open3e reports unmapped/unknown fields as hexadecimal strings (e.g. "01")
+    while other fields are already ints, so strings are always parsed as base 16.
+    """
+    return int(value, 16) if isinstance(value, str) else value
 
 
 class BinarySensorDataTransform:
@@ -25,10 +38,9 @@ class BinarySensorDataTransform:
         else json_loads(data)["PowerState"] > 0
     )
     STATE = lambda data: json_loads(data)["State"] > 0
+    MODE = lambda data: json_loads(data)["Mode"] > 0
     HYGIENE_ACTIVE = lambda data: json_loads(data)["HygenieActive"] > 0
-    BACKUP_BOX_INSTALLED = lambda data: json_loads(data)[
-                                            "Unknown"] > 0  # TODO: Needs to be renamed when open3e is updated to BackUpBoxInstalled
-    HEX_ON = lambda data: data != "000000"  # on
+    BACKUP_BOX_INSTALLED = lambda data: _to_int(json_loads(data)["Unknown"]) > 0  # TODO: Needs to be renamed when open3e is updated to BackUpBoxInstalled
     RAW = lambda data: data
     """The data state represents a raw value without any encapsulation."""
 
@@ -87,11 +99,10 @@ BINARY_SENSORS: tuple[Open3eBinarySensorEntityDescription, ...] = (
     ),
     Open3eBinarySensorEntityDescription(
         poll_data_features=[Features.State.LegionellaProtectionActivation],
-        device_class=BinarySensorDeviceClass.POWER,
-        icon="mdi:water-plus",
+        icon="mdi:bacteria-outline",
         key="legionella_protection_activation",
         translation_key="legionella_protection_activation",
-        data_transform=BinarySensorDataTransform.STATE,
+        data_transform=BinarySensorDataTransform.MODE,
         required_device=Open3eDevices.Vitodens
     ),
     Open3eBinarySensorEntityDescription(
@@ -112,6 +123,15 @@ BINARY_SENSORS: tuple[Open3eBinarySensorEntityDescription, ...] = (
         translation_key="mixer_one_circuit_operation_state",
         entity_registry_enabled_default=False,
         data_transform=lambda data: int(json_loads(data)["State"]["ID"]) < 255,
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+    Open3eBinarySensorEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitSummerSavingTemperatureThreshold],
+        icon="mdi:weather-sunny",
+        key="mixer_one_circuit_summer_saving",
+        translation_key="mixer_one_circuit_summer_saving",
+        data_transform=lambda data: int(json_loads(data)["State"]) > 0,
         required_capabilities=[Capability.Circuit1],
         required_device=Open3eDevices.Vitodens
     ),
@@ -230,12 +250,21 @@ BINARY_SENSORS: tuple[Open3eBinarySensorEntityDescription, ...] = (
         required_device=Open3eDevices.Vitocal
     ),
     Open3eBinarySensorEntityDescription(
-        device_class=BinarySensorDeviceClass.POWER,
         poll_data_features=[Features.State.DomesticHotWaterCirculationPumpMode],
         key="hot_water_circulation_pump_hygiene",
         translation_key="hot_water_circulation_pump_hygiene",
-        icon="mdi:bacteria-outline",
+        entity_registry_enabled_default=False,
+        icon="mdi:water-sync",
         data_transform=BinarySensorDataTransform.HYGIENE_ACTIVE,
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eBinarySensorEntityDescription(
+        poll_data_features=[Features.State.LegionellaProtectionActivation],
+        key="legionella_protection_activation",
+        translation_key="legionella_protection_activation",
+        entity_registry_enabled_default=False,
+        icon="mdi:bacteria-outline",
+        data_transform=BinarySensorDataTransform.MODE,
         required_device=Open3eDevices.Vitocal
     ),
 
@@ -304,7 +333,7 @@ BINARY_SENSORS: tuple[Open3eBinarySensorEntityDescription, ...] = (
         key="frost_protection_active",
         translation_key="frost_protection_active",
         icon="mdi:snowflake-alert",
-        data_transform=is_frost_protection_active,
+        data_transform=is_status_dtc_frost_protection_active,
         required_device=Open3eDevices.Vitocal
     ),
     Open3eBinarySensorEntityDescription(
@@ -352,7 +381,7 @@ BINARY_SENSORS: tuple[Open3eBinarySensorEntityDescription, ...] = (
         key="frost_protection",
         translation_key="frost_protection",
         icon="mdi:snowflake-melt",
-        data_transform=BinarySensorDataTransform.HEX_ON,
+        data_transform=is_frost_protection_active,
         required_device=Open3eDevices.Vitoair
     ),
     Open3eBinarySensorEntityDescription(

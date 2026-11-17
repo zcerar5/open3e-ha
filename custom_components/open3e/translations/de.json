@@ -415,6 +415,9 @@
       "cop_heating_current_year": {
         "name": "COP Heizung Jahr"
       },
+      "cop_cooling_current_year": {
+        "name": "COP Kühlen Jahr"
+      },
       "cop_dhw_current_year": {
         "name": "COP Warmwasser Jahr"
       },
@@ -452,11 +455,14 @@
         "name": "Verfügbare Bypass-Modi"
       },
       "ventilation_bypass_operation_level": {
-        "name": "Bypass-Betriebsstufe",
+        "name": "Bypass Arbeitsweise",
         "state": {
           "noise_reduced": "Geräuschreduziert",
           "dynamic": "Dynamisch"
         }
+      },
+      "ventilation_bypass_dynamic_level": {
+        "name": "Lüftungsstufe dynamischer Bypass"
       },
       "ventilation_bypass_position": {
         "name": "Bypass-Position"
@@ -611,6 +617,19 @@
       "gateway_remote_signal_strength": {
         "name": "WLAN Signalstärke"
       },
+      "gateway_ethernet_mac": {
+        "name": "LAN MAC Adresse"
+      },
+      "gateway_ethernet_network_status": {
+        "name": "LAN Status",
+        "state": {
+          "connected": "Verbunden",
+          "not_connected": "Nicht verbunden"
+        }
+      },
+      "gateway_ethernet_ip": {
+        "name": "LAN IP Adresse"
+      },
       "central_heating_one_circuit_name": {
         "name": "Name Heizkreis 1"
       },
@@ -674,6 +693,12 @@
       "circuit2_pump_status": {
         "name": "Heizkreis 2 Pumpe Status"
       },
+      "circuit3_pump_status": {
+        "name": "Heizkreis 3 Pumpe Status"
+      },
+      "circuit4_pump_status": {
+        "name": "Heizkreis 4 Pumpe Status"
+      },
       "compressor_max_speed_heating": {
         "name": "Kompressor Max-Drehzahl Heizen"
       },
@@ -693,6 +718,41 @@
           "active": "Aktiv",
           "postrun": "Nachlauf"
         }
+      },
+      "dhw_tank_anode_current": {
+        "name": "Anodenstrom Warmwasserspeicher"
+      },
+      "dhw_tank_anode_current_average": {
+        "name": "Anodenstrom Warmwasserspeicher Mittelwert"
+      },
+      "dhw_tank_anode_current_minimum": {
+        "name": "Anodenstrom Warmwasserspeicher Minimum"
+      },
+      "dhw_tank_anode_current_maximum": {
+        "name": "Anodenstrom Warmwasserspeicher Maximum"
+      },
+      "dhw_tank_anode_sensor_status": {
+        "name": "Anodensensor Warmwasserspeicher Status",
+        "state": {
+          "no_error": "Kein Fehler",
+          "interruption": "Unterbrechung",
+          "short_circuit": "Kurzschluss",
+          "electrical_fault": "Elektrischer Fehler",
+          "not_available": "Nicht verfügbar",
+          "invalidates": "Ungültig"
+        }
+      },
+      "water_pressure_default": {
+        "name": "Wasserdruck Standard"
+      },
+      "water_pressure_normal_delta": {
+        "name": "Wasserdruck normale Abweichung"
+      },
+      "water_pressure_maximum": {
+        "name": "Wasserdruck Maximum"
+      },
+      "water_pressure_error_threshold": {
+        "name": "Wasserdruck Fehlerschwelle"
       },
       "flow_temperature_circuit1_maximum": {
         "name": "Heizkreis 1 Vorlauftemperatur Maximum"
@@ -714,6 +774,15 @@
       },
       "mixer_one_circuit_current_temperature_setpoint": {
         "name": "Heizkreis 1 Temperatur Sollwert aktuell"
+      },
+      "mixer_one_circuit_pump_minimum_speed": {
+        "name": "Heizkreis 1 Pumpe Mindestdrehzahl"
+      },
+      "mixer_one_circuit_pump_maximum_speed": {
+        "name": "Heizkreis 1 Pumpe Maximaldrehzahl"
+      },
+      "mixer_one_circuit_summer_saving_temperature": {
+        "name": "Heizkreis 1 Sommersparschaltung Temperaturgrenze"
       },
       "mixer_two_circuit_current_temperature_setpoint": {
         "name": "Heizkreis 2 Temperatur Sollwert aktuell"
@@ -822,6 +891,36 @@
       },
       "energy_own_consumption_past_year": {
         "name": "Eigener Energieverbrauch letztes Jahr"
+      },
+      "energy_recovered_today": {
+        "name": "Wärmerückgewinnung heute"
+      },
+      "energy_recovered_current_month": {
+        "name": "Wärmerückgewinnung Monat"
+      },
+      "energy_recovered_current_year": {
+        "name": "Wärmerückgewinnung Jahr"
+      },
+      "energy_recovered_past_year": {
+        "name": "Wärmerückgewinnung letztes Jahr"
+      },
+      "minimum_supply_air_temperature_dynamic": {
+        "name": "Minimale Zulufttemperatur (Dynamisch)"
+      },
+      "minimum_supply_air_temperature_noise_reduced": {
+        "name": "Minimale Zulufttemperatur (Geräuschreduziert)"
+      },
+      "filter_runtime": {
+        "name": "Filterlaufzeit"
+      },
+      "filter_runtime_remaining": {
+        "name": "Verbleibende Filterlaufzeit"
+      },
+      "filter_condition": {
+        "name": "Filterverschmutzungszustand"
+      },
+      "current_ventilation_heat_recovery": {
+        "name": "Wärmerückgewinnung"
       }
     },
     "binary_sensor": {
@@ -841,7 +940,7 @@
         "name": "Heizkreis 4 Umwälzpumpe"
       },
       "hot_water_circulation_pump_hygiene": {
-        "name": "Warmwasser Legionellenschutz"
+        "name": "Zirkulationspumpe bei Hygienefunktion"
       },
       "additional_heater_active": {
         "name": "Heizstab"
@@ -865,13 +964,16 @@
         "name": "Warmwasser Status"
       },
       "legionella_protection_activation": {
-        "name": "Legionellenschutz aktiv"
+        "name": "Legionellenschutz"
       },
       "malfunction_heating_unit_blocked": {
         "name": "Heizung Fehlfunktion"
       },
       "mixer_one_circuit_operation_state": {
         "name": "Umwälzpumpe Heizkreis 1"
+      },
+      "mixer_one_circuit_summer_saving": {
+        "name": "Heizkreis 1 Sommersparschaltung"
       },
       "mixer_two_circuit_operation_state": {
         "name": "Umwälzpumpe Heizkreis 2"
@@ -1000,6 +1102,9 @@
       }
     },
     "number": {
+      "quick_mode_duration": {
+        "name": "Schnellmodus Dauer"
+      },
       "circuit_1_comfort_temperature": {
         "name": "Heiz-Kühlkreis 1 Heizen Komfort"
       },
@@ -1135,6 +1240,15 @@
       "frost_protection_temperature": {
         "name": "Frostschutztemperatur Heizkreis"
       },
+      "mixer_one_circuit_room_temperature_reduced": {
+        "name": "Heizkreis 1 Raumtemperatur Reduziert"
+      },
+      "mixer_one_circuit_room_temperature_standard": {
+        "name": "Heizkreis 1 Raumtemperatur Normal"
+      },
+      "mixer_one_circuit_room_temperature_comfort": {
+        "name": "Heizkreis 1 Raumtemperatur Komfort"
+      },
       "circuit_1_heating_curve_slope": {
         "name": "Heizkurve 1 Steigung"
       },
@@ -1153,6 +1267,9 @@
       "circuit_2_heating_curve_level": {
         "name": "Heizkurve 2 Verschiebung"
       },
+      "circuit_2_flow_temperature_offset": {
+        "name": "Heizkreis 2 Puffer-Sollwert Offset"
+      },
       "circuit_3_heating_curve_level": {
         "name": "Heizkurve 3 Verschiebung"
       },
@@ -1164,6 +1281,12 @@
       },
       "dhw_hysteresis_off": {
         "name": "Warmwasser Hysterese aus"
+      },
+      "buffer_hysteresis_on": {
+        "name": "Pufferspeicher Hysterese an"
+      },
+      "buffer_hysteresis_off": {
+        "name": "Pufferspeicher Hysterese aus"
       },
       "circuit_1_pump_speed": {
         "name": "Heizkreis 1 Umwälzpumpe Drehzahl"
@@ -1201,15 +1324,15 @@
           "none": "-",
           "intensive": "Intensivlüftung",
           "reduced_noise": "Reduzierte Lüftung",
-          "off": "Aus"
+          "off": "Temporäre Anlagenabschaltung"
         }
       },
       "ventilation_bypass_operation_state": {
-        "name": "Bypass-Betriebszustand",
+        "name": "Bypass Betriebsart",
         "state": {
           "closed": "Geschlossen",
-          "open": "Offen",
-          "automatic": "Automatik"
+          "open": "Geöffnet",
+          "automatic": "Automatisch"
         }
       }
     },

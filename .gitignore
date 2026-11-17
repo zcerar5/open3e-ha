@@ -21,5 +21,10 @@ coverage.xml
 config/*
 !config/configuration.yaml
 
-.junie/memory
-.junie/plans
+# Claude Code
+.claude/settings.json
+
+# Local dev session scripts (server-specific)
+scripts/dev-start
+scripts/dev-stop
+scripts/dev-pull

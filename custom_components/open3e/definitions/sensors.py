@@ -23,10 +23,12 @@ from .subfeatures.domestic_hot_water_status import (
     get_domestic_hot_water_status,
 )
 from .subfeatures.energy_management_mode import ENERGY_MANAGEMENT_MODES_MAP, EnergyManagementMode
+from .subfeatures.first_byte_value import get_first_byte_value
 from .subfeatures.four_three_way_valve_position import (
     FourThreeWayValvePosition,
     get_four_three_way_valve_position,
 )
+from .subfeatures.gateway_ethernet_ip import get_gateway_ethernet_ip
 from .subfeatures.heat_pump_activity import (
     HeatPumpActivity,
     compute_heat_pump_activity,
@@ -42,6 +44,7 @@ from .subfeatures.refrigeration_circuit_mode import (
     RefrigerationCircuitOperationMode,
     get_refrigeration_circuit_mode,
 )
+from .subfeatures.sensor_status import SensorStatus, get_sensor_status
 from .subfeatures.smart_grid_feature_selection import (
     SmartGridFeatureSelection,
     get_smart_grid_feature_selection,
@@ -58,6 +61,8 @@ from .subfeatures.ventilation_bypass_operation_level import (
     VentilationBypassOperationLevel,
     get_ventilation_bypass_operation_level,
 )
+from .subfeatures.ventilation_bypass_position import get_ventilation_bypass_position
+from .subfeatures.ventilation_volume_flow import get_exhaust_air_volume_flow
 from ..capability.capability import Capability
 
 
@@ -153,11 +158,20 @@ class SensorDataRetriever:
     HOURS = lambda data: int(json_loads(data)["hours"])
     TARGET_FLOW = lambda data: float(json_loads(data)["TargetFlow"])
     TEXT = lambda data: str(json_loads(data)["Text"])
-    UNKNOWN = lambda data: float(json_loads(data)["Unknown"])
     RAWSTR = lambda data: str(data[1:][:-1])
     HEX_INT = lambda data: int(str(data), 16) if data is not None else None
     RAW = lambda data: float(data)
     """The data state represents a raw value without any encapsulation."""
+
+    @staticmethod
+    def complex_field(field: str) -> Callable[[Any], float | None]:
+        """Read a numeric field of a complex payload; None for raw hex payloads from older Open3e releases."""
+
+        def retrieve(data: Any) -> float | None:
+            payload = json_loads(data)
+            return float(payload[field]) if isinstance(payload, dict) else None
+
+        return retrieve
 
     @staticmethod
     def cleaned_ip(ip_str: str) -> str:
@@ -395,6 +409,7 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         key="gateway_mac",
         translation_key="gateway_mac",
+        excluded_capabilities=[Capability.Ethernet],
         icon="mdi:ethernet",
         data_retriever=SensorDataRetriever.RAWSTR
     ),
@@ -403,9 +418,9 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:access-point-network",
-        entity_registry_enabled_default=False,
         key="gateway_remote_local_network_status",
         translation_key="gateway_remote_local_network_status",
+        excluded_capabilities=[Capability.Ethernet],
         data_retriever=lambda data: get_connection_status(int(data)),
         options=[mode for mode in ConnectionStatus]
     ),
@@ -414,6 +429,7 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         key="gateway_remote_ip",
         translation_key="gateway_remote_ip",
+        excluded_capabilities=[Capability.Ethernet],
         icon="mdi:ip-network",
         data_retriever=lambda data: SensorDataRetriever.cleaned_ip(json_loads(data)["WLAN_IP-Address"])
     ),
@@ -424,8 +440,38 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         native_unit_of_measurement="dB",
         key="gateway_remote_signal_strength",
         translation_key="gateway_remote_signal_strength",
+        excluded_capabilities=[Capability.Ethernet],
         icon="mdi:wifi",
         data_retriever=SensorDataRetriever.RAW
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.MacAddressLan],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        key="gateway_ethernet_mac",
+        translation_key="gateway_ethernet_mac",
+        required_capabilities=[Capability.Ethernet],
+        icon="mdi:ethernet",
+        data_retriever=SensorDataRetriever.RAWSTR
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.GatewayEthernetNetworkStatus],
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:lan-connect",
+        key="gateway_ethernet_network_status",
+        translation_key="gateway_ethernet_network_status",
+        required_capabilities=[Capability.Ethernet],
+        data_retriever=lambda data: get_connection_status(int(data)),
+        options=[mode for mode in ConnectionStatus]
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.GatewayEthernetIp],
+        entity_category=EntityCategory.DIAGNOSTIC,
+        key="gateway_ethernet_ip",
+        translation_key="gateway_ethernet_ip",
+        required_capabilities=[Capability.Ethernet],
+        icon="mdi:ip-network",
+        data_retriever=get_gateway_ethernet_ip
     ),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Misc.TimeSettingSource],
@@ -673,6 +719,98 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         data_retriever=SensorDataRetriever.RAW,
         required_device=Open3eDevices.Vitodens
     ),
+
+    # DID 987: MixerOneCircuitFlowTemperatureTargetSetpoint
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitFlowTemperatureTargetSetpoint],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="flow_circuit_1_supply_temp_setpoint",
+        translation_key="flow_circuit_1_supply_temp_setpoint",
+        data_retriever=SensorDataRetriever.RAW,
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+
+    # DID 1643: MixerOneCircuitCurrentTemperatureSetpoint
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitCurrentTemperatureSetpoint],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="mixer_one_circuit_current_temperature_setpoint",
+        translation_key="mixer_one_circuit_current_temperature_setpoint",
+        data_retriever=SensorDataRetriever.RAW,
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+
+    # DID 1192: MixerOneCircuitFlowTemperatureMinimumMaximumLimit
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitFlowTemperatureMinimumMaximumLimit],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="flow_temperature_circuit1_minimum",
+        translation_key="flow_temperature_circuit1_minimum",
+        icon="mdi:thermometer-chevron-down",
+        data_retriever=SensorDataRetriever.MINIMUM,
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitFlowTemperatureMinimumMaximumLimit],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="flow_temperature_circuit1_maximum",
+        translation_key="flow_temperature_circuit1_maximum",
+        icon="mdi:thermometer-chevron-up",
+        data_retriever=SensorDataRetriever.MAXIMUM,
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+
+    # DID 1102: MixerOneCircuitPumpMinimumMaximumLimit
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Speed.MixerOneCircuitPumpMinimumMaximumLimit],
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="mixer_one_circuit_pump_minimum_speed",
+        translation_key="mixer_one_circuit_pump_minimum_speed",
+        entity_registry_enabled_default=False,
+        icon="mdi:pump",
+        data_retriever=lambda data: float(json_loads(data)["MinSpeed"]),
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Speed.MixerOneCircuitPumpMinimumMaximumLimit],
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="mixer_one_circuit_pump_maximum_speed",
+        translation_key="mixer_one_circuit_pump_maximum_speed",
+        entity_registry_enabled_default=False,
+        icon="mdi:pump",
+        data_retriever=lambda data: float(json_loads(data)["MaxSpeed"]),
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+
+    # DID 1395: MixerOneCircuitSummerSavingTemperatureThreshold
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitSummerSavingTemperatureThreshold],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="mixer_one_circuit_summer_saving_temperature",
+        translation_key="mixer_one_circuit_summer_saving_temperature",
+        icon="mdi:weather-sunny",
+        data_retriever=lambda data: float(json_loads(data)["Temperature"]),
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Volume.AllengraSensor],
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -772,10 +910,10 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_device=Open3eDevices.Vitodens
     ),
 
-    ######### VOLUME-SENSORS #########
+    ######### GAS-SENSORS #########
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Volume.GasConsumptionCentralHeating],
-        device_class=SensorDeviceClass.VOLUME,
+        device_class=SensorDeviceClass.GAS,
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         icon="mdi:meter-gas",
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -788,7 +926,7 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
     ),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Volume.GasConsumptionDomesticHotWater],
-        device_class=SensorDeviceClass.VOLUME,
+        device_class=SensorDeviceClass.GAS,
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         icon="mdi:meter-gas",
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -1669,6 +1807,15 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_device=Open3eDevices.Vitocal
     ),
     Open3eSensorEntityDescription(
+        poll_data_features=[Features.Energy.CopCooling],
+        native_unit_of_measurement="COP",
+        icon="mdi:leaf",
+        key="cop_cooling_current_year",
+        translation_key="cop_cooling_current_year",
+        data_retriever=SensorDataRetriever.CURRENT_YEAR,
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
         poll_data_features=[Features.Energy.CopDhw],
         native_unit_of_measurement="COP",
         icon="mdi:leaf",
@@ -1742,9 +1889,9 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_device=Open3eDevices.Vitocal
     ),
 
-    # DID 1100: DomesticHotWaterPumpMinimumLimit
+    # DID 1101: DomesticHotWaterPumpMinimumMaximumLimit
     Open3eSensorEntityDescription(
-        poll_data_features=[Features.Speed.DomesticHotWaterPumpMinimumLimit],
+        poll_data_features=[Features.Speed.DomesticHotWaterPumpMinimumMaximumLimit],
         device_class=SensorDeviceClass.POWER_FACTOR,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -1754,9 +1901,8 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         data_retriever=lambda data: float(json_loads(data)["MinSpeed"]),
         required_device=Open3eDevices.Vitocal
     ),
-    # DID 1101: DomesticHotWaterPumpMaximumLimit
     Open3eSensorEntityDescription(
-        poll_data_features=[Features.Speed.DomesticHotWaterPumpMaximumLimit],
+        poll_data_features=[Features.Speed.DomesticHotWaterPumpMinimumMaximumLimit],
         device_class=SensorDeviceClass.POWER_FACTOR,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -1919,7 +2065,7 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         required_device=Open3eDevices.Vitocal
     ),
 
-    # DID 2791/2792/2793: PumpStatus Central / Circuit1 / Circuit2
+    # DID 2791-2795: PumpStatus Central / Circuit1-4
     Open3eSensorEntityDescription(
         poll_data_features=[Features.State.CentralHeatingPumpStatus],
         device_class=SensorDeviceClass.POWER_FACTOR,
@@ -1953,6 +2099,30 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         icon="mdi:pump",
         data_retriever=SensorDataRetriever.ACTUAL,
         required_capabilities=[Capability.Circuit2],
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.State.MixerThreeCircuitPumpStatus],
+        device_class=SensorDeviceClass.POWER_FACTOR,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="circuit3_pump_status",
+        translation_key="circuit3_pump_status",
+        icon="mdi:pump",
+        data_retriever=lambda data: None if (val := float(json_loads(data)["Actual"])) == 255 else val,
+        required_capabilities=[Capability.Circuit3],
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.State.MixerFourCircuitPumpStatus],
+        device_class=SensorDeviceClass.POWER_FACTOR,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="circuit4_pump_status",
+        translation_key="circuit4_pump_status",
+        icon="mdi:pump",
+        data_retriever=lambda data: None if (val := float(json_loads(data)["Actual"])) == 255 else val,
+        required_capabilities=[Capability.Circuit4],
         required_device=Open3eDevices.Vitocal
     ),
 
@@ -2077,6 +2247,116 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
         data_retriever=SensorDataRetriever.RAWSTR,
         required_capabilities=[Capability.Circuit4],
+        required_device=Open3eDevices.Vitocal
+    ),
+
+    # DID 3170: DomesticHotWaterTankAnodeSensor
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.DomesticHotWaterTankAnode],
+        device_class=SensorDeviceClass.CURRENT,
+        icon="mdi:flash",
+        key="dhw_tank_anode_current",
+        translation_key="dhw_tank_anode_current",
+        native_unit_of_measurement=UnitOfElectricCurrent.MILLIAMPERE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Actual"),
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.DomesticHotWaterTankAnode],
+        device_class=SensorDeviceClass.CURRENT,
+        icon="mdi:flash",
+        key="dhw_tank_anode_current_average",
+        translation_key="dhw_tank_anode_current_average",
+        native_unit_of_measurement=UnitOfElectricCurrent.MILLIAMPERE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Average"),
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.DomesticHotWaterTankAnode],
+        device_class=SensorDeviceClass.CURRENT,
+        icon="mdi:flash",
+        key="dhw_tank_anode_current_minimum",
+        translation_key="dhw_tank_anode_current_minimum",
+        native_unit_of_measurement=UnitOfElectricCurrent.MILLIAMPERE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Min"),
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.DomesticHotWaterTankAnode],
+        device_class=SensorDeviceClass.CURRENT,
+        icon="mdi:flash",
+        key="dhw_tank_anode_current_maximum",
+        translation_key="dhw_tank_anode_current_maximum",
+        native_unit_of_measurement=UnitOfElectricCurrent.MILLIAMPERE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Max"),
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Misc.DomesticHotWaterTankAnode],
+        device_class=SensorDeviceClass.ENUM,
+        options=[status.value for status in SensorStatus],
+        icon="mdi:shield-check-outline",
+        key="dhw_tank_anode_sensor_status",
+        translation_key="dhw_tank_anode_sensor_status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        data_retriever=get_sensor_status,
+        required_device=Open3eDevices.Vitocal
+    ),
+
+    # DID 1721: WaterPressureConfiguration
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Pressure.WaterConfiguration],
+        device_class=SensorDeviceClass.PRESSURE,
+        key="water_pressure_default",
+        translation_key="water_pressure_default",
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Default Pressure"),
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Pressure.WaterConfiguration],
+        device_class=SensorDeviceClass.PRESSURE,
+        key="water_pressure_normal_delta",
+        translation_key="water_pressure_normal_delta",
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Normal Pressure Delta"),
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Pressure.WaterConfiguration],
+        device_class=SensorDeviceClass.PRESSURE,
+        key="water_pressure_maximum",
+        translation_key="water_pressure_maximum",
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Maximum Pressure"),
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Pressure.WaterConfiguration],
+        device_class=SensorDeviceClass.PRESSURE,
+        key="water_pressure_error_threshold",
+        translation_key="water_pressure_error_threshold",
+        native_unit_of_measurement=UnitOfPressure.BAR,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        data_retriever=SensorDataRetriever.complex_field("Error Threshold"),
         required_device=Open3eDevices.Vitocal
     ),
 
@@ -2573,7 +2853,7 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         icon="mdi:fan",
         key="ventilation_exhaust_air_volume",
         translation_key="ventilation_exhaust_air_volume",
-        data_retriever=SensorDataRetriever.UNKNOWN,
+        data_retriever=get_exhaust_air_volume_flow,
         required_device=Open3eDevices.Vitoair
     ),
     Open3eSensorEntityDescription(
@@ -2597,16 +2877,16 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         data_retriever=SensorDataRetriever.RAW,
         required_device=Open3eDevices.Vitoair
     ),
-    # Open3eSensorEntityDescription(
-    #     poll_data_features=[Features.State.VentilationBypassPosition],
-    #     native_unit_of_measurement=PERCENTAGE,
-    #     state_class=SensorStateClass.MEASUREMENT,
-    #     key="ventilation_bypass_position",
-    #     translation_key="ventilation_bypass_position",
-    #     icon="mdi:valve",
-    #     data_retriever=SensorDataRetriever.HEX_INT,
-    #     required_device=Open3eDevices.Vitoair
-    # ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.State.VentilationBypassPosition],
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="ventilation_bypass_position",
+        translation_key="ventilation_bypass_position",
+        icon="mdi:valve",
+        data_retriever=get_ventilation_bypass_position,
+        required_device=Open3eDevices.Vitoair
+    ),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.State.VentilationBypassFlapAvailableCount],
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -2626,6 +2906,16 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         data_retriever=get_ventilation_bypass_operation_level,
         options=[level for level in VentilationBypassOperationLevel],
         required_device=Open3eDevices.Vitoair,
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.State.VentilationBypassDynamicVentilationLevel],
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:fan",
+        suggested_display_precision=0,
+        key="ventilation_bypass_dynamic_level",
+        translation_key="ventilation_bypass_dynamic_level",
+        data_retriever=get_first_byte_value,
+        required_device=Open3eDevices.Vitoair
     ),
     Open3eSensorEntityDescription(
         poll_data_features=[Features.Energy.EnergyOwnConsumption],
@@ -2666,6 +2956,117 @@ SENSORS: tuple[Open3eSensorEntityDescription, ...] = (
         translation_key="energy_own_consumption_past_year",
         data_retriever=SensorDataRetriever.PAST_YEAR,
         entity_registry_enabled_default=False,
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Energy.EnergyRecoveredCrossHeatExchanger],
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:heat-wave",
+        key="energy_recovered_today",
+        translation_key="energy_recovered_today",
+        data_retriever=SensorDataRetriever.complex_field("Today"),
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Energy.EnergyRecoveredCrossHeatExchanger],
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:heat-wave",
+        key="energy_recovered_current_month",
+        translation_key="energy_recovered_current_month",
+        data_retriever=SensorDataRetriever.complex_field("CurrentMonth"),
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Energy.EnergyRecoveredCrossHeatExchanger],
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:heat-wave",
+        key="energy_recovered_current_year",
+        translation_key="energy_recovered_current_year",
+        data_retriever=SensorDataRetriever.complex_field("CurrentYear"),
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Energy.EnergyRecoveredCrossHeatExchanger],
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:heat-wave",
+        key="energy_recovered_past_year",
+        translation_key="energy_recovered_past_year",
+        data_retriever=SensorDataRetriever.complex_field("PastYear"),
+        entity_registry_enabled_default=False,
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Temperature.MinimumVentilationSupplyAir],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="minimum_supply_air_temperature_dynamic",
+        translation_key="minimum_supply_air_temperature_dynamic",
+        data_retriever=lambda data: float(json_loads(data)["Sensor1"]),
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Temperature.MinimumVentilationSupplyAir],
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        key="minimum_supply_air_temperature_noise_reduced",
+        translation_key="minimum_supply_air_temperature_noise_reduced",
+        data_retriever=lambda data: float(json_loads(data)["Sensor2"]),
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Time.FilterRuntime],
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:air-filter",
+        key="filter_runtime",
+        translation_key="filter_runtime",
+        data_retriever=lambda data: int(json_loads(data)["Actual"]),
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.Time.FilterRuntime],
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:air-filter",
+        key="filter_runtime_remaining",
+        translation_key="filter_runtime_remaining",
+        data_retriever=lambda data: int(json_loads(data)["Remaining"]),
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.State.FilterPercentageBlocked],
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:air-filter",
+        key="filter_condition",
+        translation_key="filter_condition",
+        data_retriever=get_first_byte_value,
+        required_device=Open3eDevices.Vitoair
+    ),
+    Open3eSensorEntityDescription(
+        poll_data_features=[Features.State.CurrentVentilationHeatRecovery],
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:heat-wave",
+        key="current_ventilation_heat_recovery",
+        translation_key="current_ventilation_heat_recovery",
+        data_retriever=SensorDataRetriever.RAW,
         required_device=Open3eDevices.Vitoair
     ),
 )

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Callable, Any, Awaitable
 
 from homeassistant.components.number import NumberEntityDescription, NumberDeviceClass
-from homeassistant.const import UnitOfTemperature, UnitOfPower, PERCENTAGE
+from homeassistant.const import UnitOfTemperature, UnitOfPower, PERCENTAGE, UnitOfTime, EntityCategory
 
 from custom_components.open3e.definitions.subfeatures.buffer import Buffer
 from custom_components.open3e.definitions.subfeatures.hysteresis import Hysteresis
@@ -13,13 +13,17 @@ from .devices import Open3eDevices
 from .entity_description import Open3eEntityDescription
 from .features import Features
 from .open3e_data import Open3eDataDevice
-from .subfeatures.dhw_hysteresis import DhwHysteresis
+from .subfeatures.dhw_hysteresis import DhwHysteresis, get_hysteresis_setpoint
 from .subfeatures.heating_curve import HeatingCurve
+from .subfeatures.mixer_circuit_property import MixerCircuitProperty
+from .subfeatures.vitoair_quick_mode import get_vitoair_quick_mode
 from .. import Open3eDataUpdateCoordinator
 from ..capability.capability import Capability
 from ..const import VIESSMANN_TEMP_HEATING_MIN, VIESSMANN_TEMP_HEATING_MAX, VIESSMANN_POWER_MAX_WATT_ELECTRICAL_HEATER, \
     VIESSMANN_POWER_MIN_WATT_ELECTRICAL_HEATER, VIESSMANN_POWER_WATT_ELECTRICAL_HEATER_STEP, \
-    VIESSMANN_SMART_GRID_TEMP_MIN, VIESSMANN_SMART_GRID_TEMP_MAX, VIESSMANN_HYSTERESIS_MIN, VIESSMANN_HYSTERESIS_MAX
+    VIESSMANN_SMART_GRID_TEMP_MIN, VIESSMANN_SMART_GRID_TEMP_MAX, VIESSMANN_HYSTERESIS_MIN, VIESSMANN_HYSTERESIS_MAX, \
+    VITOAIR_QUICK_MODE_RUNTIME_MIN, VITOAIR_QUICK_MODE_RUNTIME_MAX, VITOAIR_QUICK_MODE_RUNTIME_STEP, \
+    VITOAIR_QUICK_MODE_RUNTIME_DEFAULT
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,11 @@ class Open3eNumberEntityDescription(
     domain: str = "number"
     get_native_value: Callable[[Any], float] = None
     set_native_value: Callable[[float, Open3eDataDevice, Open3eDataUpdateCoordinator], Awaitable[None]] = None
+    local_default_value: float | None = None
+    """Set for numbers whose value only lives in HA because no DID holds it. The value starts at this default, is
+    restored after a restart and handed to set_local_value; get_native_value and set_native_value are not used."""
+    set_local_value: Callable[[float, str | None, Open3eDataDevice, Open3eDataUpdateCoordinator], Awaitable[None]] = None
+    """Receives the local value and the latest raw payload of the first poll feature (None when restored at startup)."""
 
 
 NUMBERS: tuple[Open3eNumberEntityDescription, ...] = (
@@ -991,6 +1000,26 @@ NUMBERS: tuple[Open3eNumberEntityDescription, ...] = (
         required_device=Open3eDevices.Vitocal
     ),
     Open3eNumberEntityDescription(
+        poll_data_features=[Features.State.MixerTwoCircuitProperty],
+        native_unit_of_measurement=UnitOfTemperature.KELVIN,
+        device_class=NumberDeviceClass.TEMPERATURE_DELTA,
+        entity_registry_enabled_default=False,
+        icon="mdi:thermometer-plus",
+        native_min_value=0,
+        native_max_value=20,
+        native_step=1,
+        get_native_value=lambda data: data[MixerCircuitProperty.FlowTemperatureOffset],
+        set_native_value=lambda value, device, coordinator: coordinator.async_set_flow_temperature_offset(
+            feature_id=Features.State.MixerTwoCircuitProperty.id,
+            value=value,
+            device=device
+        ),
+        key="circuit_2_flow_temperature_offset",
+        translation_key="circuit_2_flow_temperature_offset",
+        required_capabilities=[Capability.Circuit2],
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eNumberEntityDescription(
         poll_data_features=[Features.State.FlowCircuit3HeatingCurve],
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=NumberDeviceClass.TEMPERATURE,
@@ -1066,6 +1095,44 @@ NUMBERS: tuple[Open3eNumberEntityDescription, ...] = (
         ),
         key="dhw_hysteresis_off",
         translation_key="dhw_hysteresis_off",
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eNumberEntityDescription(
+        poll_data_features=[Features.Temperature.BufferHysteresis],
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=NumberDeviceClass.TEMPERATURE,
+        icon="mdi:thermometer-chevron-up",
+        native_min_value=0,
+        native_max_value=10,
+        native_step=1,
+        get_native_value=lambda data: get_hysteresis_setpoint(data, DhwHysteresis.On),
+        set_native_value=lambda value, device, coordinator: coordinator.async_set_dhw_hysteresis(
+            feature_id=Features.Temperature.BufferHysteresis.id,
+            hysteresis=DhwHysteresis.On,
+            value=value,
+            device=device
+        ),
+        key="buffer_hysteresis_on",
+        translation_key="buffer_hysteresis_on",
+        required_device=Open3eDevices.Vitocal
+    ),
+    Open3eNumberEntityDescription(
+        poll_data_features=[Features.Temperature.BufferHysteresis],
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=NumberDeviceClass.TEMPERATURE,
+        icon="mdi:thermometer-chevron-down",
+        native_min_value=0,
+        native_max_value=10,
+        native_step=1,
+        get_native_value=lambda data: get_hysteresis_setpoint(data, DhwHysteresis.Off),
+        set_native_value=lambda value, device, coordinator: coordinator.async_set_dhw_hysteresis(
+            feature_id=Features.Temperature.BufferHysteresis.id,
+            hysteresis=DhwHysteresis.Off,
+            value=value,
+            device=device
+        ),
+        key="buffer_hysteresis_off",
+        translation_key="buffer_hysteresis_off",
         required_device=Open3eDevices.Vitocal
     ),
     Open3eNumberEntityDescription(
@@ -1188,6 +1255,64 @@ NUMBERS: tuple[Open3eNumberEntityDescription, ...] = (
     ##################
     ###  Vitodens  ###
     ##################
+    # DID 424: MixerOneCircuitRoomTemperatureSetpoint
+    Open3eNumberEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitRoomTemperatureSetpoint],
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=NumberDeviceClass.TEMPERATURE,
+        native_min_value=VIESSMANN_TEMP_HEATING_MIN,
+        native_max_value=VIESSMANN_TEMP_HEATING_MAX,
+        native_step=1,
+        get_native_value=lambda data: data[Program.Reduced.map_to_api_heating()],
+        set_native_value=lambda value, device, coordinator: coordinator.async_set_program_temperature(
+            set_programs_feature_id=Features.Temperature.MixerOneCircuitRoomTemperatureSetpoint.id,
+            program=Program.Reduced,
+            temperature=value,
+            device=device
+        ),
+        key="mixer_one_circuit_room_temperature_reduced",
+        translation_key="mixer_one_circuit_room_temperature_reduced",
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+    Open3eNumberEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitRoomTemperatureSetpoint],
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=NumberDeviceClass.TEMPERATURE,
+        native_min_value=VIESSMANN_TEMP_HEATING_MIN,
+        native_max_value=VIESSMANN_TEMP_HEATING_MAX,
+        native_step=1,
+        get_native_value=lambda data: data[Program.Normal.map_to_api_heating()],
+        set_native_value=lambda value, device, coordinator: coordinator.async_set_program_temperature(
+            set_programs_feature_id=Features.Temperature.MixerOneCircuitRoomTemperatureSetpoint.id,
+            program=Program.Normal,
+            temperature=value,
+            device=device
+        ),
+        key="mixer_one_circuit_room_temperature_standard",
+        translation_key="mixer_one_circuit_room_temperature_standard",
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
+    Open3eNumberEntityDescription(
+        poll_data_features=[Features.Temperature.MixerOneCircuitRoomTemperatureSetpoint],
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=NumberDeviceClass.TEMPERATURE,
+        native_min_value=VIESSMANN_TEMP_HEATING_MIN,
+        native_max_value=VIESSMANN_TEMP_HEATING_MAX,
+        native_step=1,
+        get_native_value=lambda data: data[Program.Comfort.map_to_api_heating()],
+        set_native_value=lambda value, device, coordinator: coordinator.async_set_program_temperature(
+            set_programs_feature_id=Features.Temperature.MixerOneCircuitRoomTemperatureSetpoint.id,
+            program=Program.Comfort,
+            temperature=value,
+            device=device
+        ),
+        key="mixer_one_circuit_room_temperature_comfort",
+        translation_key="mixer_one_circuit_room_temperature_comfort",
+        required_capabilities=[Capability.Circuit1],
+        required_device=Open3eDevices.Vitodens
+    ),
     Open3eNumberEntityDescription(
         poll_data_features=[Features.State.FlowCircuit1HeatingCurve],
         icon="mdi:slope-uphill",
@@ -1259,5 +1384,31 @@ NUMBERS: tuple[Open3eNumberEntityDescription, ...] = (
         translation_key="circuit_4_heating_curve_slope",
         required_capabilities=[Capability.Circuit4],
         required_device=Open3eDevices.Vitodens
+    ),
+
+    ###############
+    ### VITOAIR ###
+    ###############
+
+    Open3eNumberEntityDescription(
+        poll_data_features=[Features.State.CurrentQuickMode],
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        device_class=NumberDeviceClass.DURATION,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:timer-cog-outline",
+        native_min_value=VITOAIR_QUICK_MODE_RUNTIME_MIN,
+        native_max_value=VITOAIR_QUICK_MODE_RUNTIME_MAX,
+        native_step=VITOAIR_QUICK_MODE_RUNTIME_STEP,
+        local_default_value=VITOAIR_QUICK_MODE_RUNTIME_DEFAULT,
+        set_local_value=lambda value, data, device, coordinator: coordinator.async_set_vitoair_quick_mode_runtime(
+            refresh_feature_id=Features.State.CurrentQuickMode.id,
+            set_feature_id=Features.State.TargetQuickMode.id,
+            runtime=value,
+            active_mode=get_vitoair_quick_mode(data) if data is not None else None,
+            device=device
+        ),
+        key="quick_mode_duration",
+        translation_key="quick_mode_duration",
+        required_device=Open3eDevices.Vitoair
     ),
 )
